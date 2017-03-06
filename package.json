@@ -1,0 +1,17 @@
+{
+  "name": "Choxue-ffmpeg",
+  "version": "1.0.0",
+  "description": "VM instance to do splitting / combining, transcoding, highlights generation.",
+  "main": "app.js",
+  "author": "Xiao Yang Kao",
+  "license": "ISC",
+  "dependencies": {
+    "fluent-ffmpeg": "^2.1.0",
+    "google-cloud": "0.45.0",
+    "node-dir": "^0.1.16",
+    "pg": "^6.1.2",
+    "restify": "^4.3.0",
+    "restify-plugins": "^1.5.1",
+    "ws": "^2.2.0"
+  }
+}
