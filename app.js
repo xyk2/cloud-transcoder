@@ -10,7 +10,6 @@ var server = restify.createServer({
 	name: 'ffmpeg-runner'
 });
 
-
 const wss = new WebSocket.Server({ port: 8081 });
 
 wss.broadcast = function broadcast(data) {
@@ -30,13 +29,11 @@ var gcs = google_cloud.storage();
 var bucket = gcs.bucket('broadcast-cx-raw-recordings');
 var dest_bucket = gcs.bucket('broadcast-cx-sandbox');
 
-
-ffmpeg.setFfmpegPath('/Users/XYK/Desktop/ffmpeg'); // Explicitly set ffmpeg and ffprobe paths
-ffmpeg.setFfprobePath('/Users/XYK/Desktop/ffprobe');
+//ffmpeg.setFfmpegPath('/Users/XYK/Desktop/ffmpeg'); // Explicitly set ffmpeg and ffprobe paths
+//ffmpeg.setFfprobePath('/Users/XYK/Desktop/ffprobe');
 
 server.get('/transcode/HLS/:filename', hlsTranscode);
 server.get('/upload/', upload);
-
 
 
 function hlsTranscode(req, res, next) {
@@ -45,11 +42,11 @@ function hlsTranscode(req, res, next) {
 	_transcodedRenditionsCount = 0;
 
 	HD_720P_TRANSCODE = function(filename, callback) { 
-		ffmpeg(filename, { presets: '/Users/XYK/Desktop/Dropbox/broadcast.cx-ffmpeg-runner/presets' }).preset('hls')
+		ffmpeg(filename, { presets: '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/presets' }).preset('hls')
 		.videoBitrate(3000)
 		.audioBitrate('96k')
 		.size('1280x720')
-		.saveToFile('/Users/XYK/Desktop/ffmpeg_outputs/1/720p_3000k.m3u8')
+		.saveToFile('/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_outputs/720p_3000k.m3u8')
 		.on('start', function(commandLine) {
 			console.log('FFMPEG: ' + commandLine);
 			wss.broadcast('FFMPEG: ' + commandLine);
@@ -74,11 +71,11 @@ function hlsTranscode(req, res, next) {
 	}
 
 	SD_480P_TRANSCODE = function(filename, callback) {
-		ffmpeg(filename, { presets: '/Users/XYK/Desktop/Dropbox/broadcast.cx-ffmpeg-runner/presets' }).preset('hls')
+		ffmpeg(filename, { presets: '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/presets' }).preset('hls')
 		.videoBitrate(1500)
 		.audioBitrate('96k')
 		.size('854x480')
-		.saveToFile('/Users/XYK/Desktop/ffmpeg_outputs/1/480p_1500k.m3u8')
+		.saveToFile('/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_outputs/480p_1500k.m3u8')
 		.on('start', function(commandLine) {
 			console.log('FFMPEG: ' + commandLine);
 			wss.broadcast('FFMPEG: ' + commandLine);
@@ -103,11 +100,11 @@ function hlsTranscode(req, res, next) {
 	}
 
 	SD_360P_TRANSCODE = function(filename, callback) {
-		ffmpeg(filename, { presets: '/Users/XYK/Desktop/Dropbox/broadcast.cx-ffmpeg-runner/presets' }).preset('hls')
+		ffmpeg(filename, { presets: '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/presets' }).preset('hls')
 		.videoBitrate(850)
 		.audioBitrate('96k')
 		.size('640x360')
-		.saveToFile('/Users/XYK/Desktop/ffmpeg_outputs/1/360p_850k.m3u8')
+		.saveToFile('/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_outputs/360p_850k.m3u8')
 		.on('start', function(commandLine) {
 			console.log('FFMPEG: ' + commandLine);
 			wss.broadcast('FFMPEG: ' + commandLine);
@@ -132,11 +129,11 @@ function hlsTranscode(req, res, next) {
 	}
 
 	SD_240P_TRANSCODE = function(filename, callback) {
-		ffmpeg(filename, { presets: '/Users/XYK/Desktop/Dropbox/broadcast.cx-ffmpeg-runner/presets' }).preset('hls')
+		ffmpeg(filename, { presets: '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/presets' }).preset('hls')
 		.videoBitrate(400)
 		.audioBitrate('96k')
 		.size('352x240')
-		.saveToFile('/Users/XYK/Desktop/ffmpeg_outputs/1/240p_400k.m3u8')
+		.saveToFile('/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_outputs/240p_400k.m3u8')
 		.on('start', function(commandLine) {
 			console.log('FFMPEG: ' + commandLine);
 			wss.broadcast('FFMPEG: ' + commandLine);
@@ -161,7 +158,7 @@ function hlsTranscode(req, res, next) {
 	}
 
 	CREATE_INDEX_M3U8 = function() {
-		fs.createReadStream('index.m3u8').pipe(fs.createWriteStream('/Users/XYK/Desktop/ffmpeg_outputs/1/index.m3u8'));
+		fs.createReadStream('index.m3u8').pipe(fs.createWriteStream('/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_outputs/index.m3u8'));
 	}
 
 	bucket.file(req.params.filename).download({
@@ -187,7 +184,7 @@ function hlsTranscode(req, res, next) {
 	function uploadToGCS() {
 		if(_transcodedRenditionsCount != 4) return;
 
-		dir.files('/Users/XYK/Desktop/ffmpeg_outputs', function(err, files) {
+		dir.files('/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner'_outputs function(err, files) {
 			if (err) throw err;
 			files.forEach(function(file, index) {
 				if(path.extname(file) === '.m3u8' || path.extname(file) === '.ts') { // Only upload M3U8s and transport streams
@@ -229,7 +226,7 @@ function hlsTranscode(req, res, next) {
 }
 
 function upload(req, res, next) {
-	dir.files('/Users/XYK/Desktop/ffmpeg_outputs', function(err, files) {
+	dir.files('/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner'_outputs function(err, files) {
 	    if (err) throw err;
 	    files.forEach(function(file, index) {
 	    	if(path.extname(file) === '.m3u8' || path.extname(file) === '.ts') { // Only upload M3U8s and transport streams
