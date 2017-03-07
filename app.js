@@ -184,7 +184,7 @@ function hlsTranscode(req, res, next) {
 	function uploadToGCS() {
 		if(_transcodedRenditionsCount != 4) return;
 
-		dir.files('/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner'_outputs function(err, files) {
+		dir.files('/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_outputs', function(err, files) {
 			if (err) throw err;
 			files.forEach(function(file, index) {
 				if(path.extname(file) === '.m3u8' || path.extname(file) === '.ts') { // Only upload M3U8s and transport streams
@@ -226,7 +226,7 @@ function hlsTranscode(req, res, next) {
 }
 
 function upload(req, res, next) {
-	dir.files('/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner'_outputs function(err, files) {
+	dir.files('/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_outputs', function(err, files) {
 	    if (err) throw err;
 	    files.forEach(function(file, index) {
 	    	if(path.extname(file) === '.m3u8' || path.extname(file) === '.ts') { // Only upload M3U8s and transport streams
@@ -260,8 +260,13 @@ function upload(req, res, next) {
 
 
 
+if(process.env.NODE_ENV === 'production') _port = 80;
+else _port = 8080;
 
 
-server.listen(process.env.PORT || 8080, function() {
+server.listen(_port, function() {
 	console.log('%s listening at %s', server.name, server.url);
 });
+
+
+
