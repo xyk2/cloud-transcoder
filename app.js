@@ -4,6 +4,21 @@ var ffmpeg = require('fluent-ffmpeg');
 const WebSocket = require('ws');
 var dir = require('node-dir');
 var path = require('path');
+var request = require('request');
+
+
+var options = {
+  url: 'http://metadata.google.internal/computeMetadata/v1/instance/id',
+  headers: {
+    'Metadata-Flavor': 'Google'
+  }
+};
+
+request(options, function (error, response, body) {
+  console.log('error:', error); // Print the error if one occurred
+  console.log('statusCode:', response && response.statusCode); // Print the response status code if a response was received
+  console.log('body:', body); // Print the HTML for the Google homepage.
+});
 
 
 var server = restify.createServer({
@@ -253,7 +268,6 @@ function upload(req, res, next) {
 	    		});
 	    	}
 	    });
-
 	});
 }
 
