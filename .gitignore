@@ -47,6 +47,7 @@ jspm_packages
 .yarn-integrity
 
 AWS_access_keys
+*.mp4
 
 # Elastic Beanstalk Files
 .elasticbeanstalk/*
