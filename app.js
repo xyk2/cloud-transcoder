@@ -6,6 +6,18 @@ var dir = require('node-dir');
 var path = require('path');
 var request = require('request');
 
+var google_cloud = require('google-cloud')({
+	projectId: 'broadcast-cx',
+	keyFilename: 'keys/broadcast-cx-bda0296621a4.json'
+});
+
+var gcs = google_cloud.storage();
+var bucket = gcs.bucket('broadcast-cx-raw-recordings');
+var dest_bucket = gcs.bucket('broadcast-cx-sandbox');
+
+var server = restify.createServer({
+	name: 'ffmpeg-runner'
+});
 
 if(process.env.PWD == '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner') { // If there is a response from metadata server, means it is running on GCS
 	_OUTPUT_PATH = '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_outputs';
@@ -22,12 +34,6 @@ if(process.env.PWD == '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner') { /
 	_WS_PORT = 8081;
 }
 
-
-
-var server = restify.createServer({
-	name: 'ffmpeg-runner'
-});
-
 const wss = new WebSocket.Server({ port: _WS_PORT });
 
 wss.broadcast = function broadcast(data) {
@@ -38,15 +44,7 @@ wss.broadcast = function broadcast(data) {
 	});
 };
 
-var google_cloud = require('google-cloud')({
-	projectId: 'broadcast-cx',
-	keyFilename: 'keys/broadcast-cx-bda0296621a4.json'
-});
-
-var gcs = google_cloud.storage();
-var bucket = gcs.bucket('broadcast-cx-raw-recordings');
-var dest_bucket = gcs.bucket('broadcast-cx-sandbox');
-
+_transcodeInProgress = false;
 
 server.get('/transcode/hls/:filename', hlsTranscode);
 
@@ -56,8 +54,13 @@ function hlsTranscode(req, res, next) {
 		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Invalid request.'}));
 		res.send(400, {status: 1, message: "Invalid Request."});
 	}
+	if(_transcodeInProgress) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Already transcoding a file.'}));
+		res.send(400, {status: 1, message: "Already transcoding a file."});
+	}
 
-	_transcodedRenditionsCount = 0;
+	_transcodeInProgress = true;
+	_transcodedRenditionsCount = 0;	
 
 	HD_720P_TRANSCODE = function(filename, callback) { 
 		_HD_720P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
@@ -191,7 +194,7 @@ function hlsTranscode(req, res, next) {
 			wss.broadcast(JSON.stringify(progress));
 		})
 		.on('stderr', function(stderrLine) {
-		    //console.log('Stderr output: ' + stderrLine);
+		    console.log('Stderr output: ' + stderrLine);
 		})
 		.on('error', function(err, stdout, stderr) {
 			_ret = {'event': 'error', 'message': err.message};
@@ -212,6 +215,12 @@ function hlsTranscode(req, res, next) {
 		fs.createReadStream('index.m3u8').pipe(fs.createWriteStream(_OUTPUT_PATH + '/index.m3u8'));
 	}
 
+	res.send({status: 0, message: "Beginning transcode", file: req.params.filename});
+
+	_ret = {'event': 'download', 'status': 'begin', 'file': req.params.filename};
+	console.log(JSON.stringify(_ret))
+	wss.broadcast(JSON.stringify(_ret));
+
 	bucket.file(req.params.filename).download({
 	  destination: req.params.filename
 	}, function(err) {
@@ -222,11 +231,13 @@ function hlsTranscode(req, res, next) {
 			return;
 		} // Error handling (bucket file not found in GCS)
 
+		_ret = {'event': 'download', 'status': 'complete', 'file': req.params.filename};
+		console.log(JSON.stringify(_ret))
+		wss.broadcast(JSON.stringify(_ret));
 
 		fs.emptyDir(_OUTPUT_PATH, err => {
 			if (err) return console.error(err);
 
-			res.send({status: 0, message: "Transcodes started", file: req.params.filename});
 		  	CREATE_INDEX_M3U8();
 		  	HD_720P_TRANSCODE(req.params.filename, uploadToGCS);
 		  	SD_480P_TRANSCODE(req.params.filename, uploadToGCS);
@@ -240,6 +251,7 @@ function hlsTranscode(req, res, next) {
 	// Will not execute until all 4
 	function uploadToGCS() {
 		if(_transcodedRenditionsCount != 4) return;
+		_transcodeInProgress = false; // End transcode in progress flag
 
 		dir.files(_OUTPUT_PATH, function(err, files) {
 			if (err) throw err;
