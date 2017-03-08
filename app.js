@@ -53,10 +53,12 @@ function hlsTranscode(req, res, next) {
 	if(!req.params.filename) {
 		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Invalid request.'}));
 		res.send(400, {status: 1, message: "Invalid Request."});
+		return;
 	}
 	if(_transcodeInProgress) {
 		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Already transcoding a file.'}));
 		res.send(400, {status: 1, message: "Already transcoding a file."});
+		return;
 	}
 
 	_transcodeInProgress = true;
