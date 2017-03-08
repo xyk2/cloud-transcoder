@@ -6,13 +6,12 @@ var dir = require('node-dir');
 var path = require('path');
 var request = require('request');
 
-console.log(process.env);
 
 if(process.env.PWD == '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner') { // If there is a response from metadata server, means it is running on GCS
 	_OUTPUT_PATH = '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_outputs';
 	_PRESETS_PATH = '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/presets';
 	_PORT = 8080; // 8080 forwarded to 80 with iptables rule
-	_WS_PORT = 8080;
+	_WS_PORT = 8081;
 
 } else { // Running local on development
 	_OUTPUT_PATH = '/Users/XYK/Desktop/ffmpeg_outputs';
@@ -20,7 +19,7 @@ if(process.env.PWD == '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner') { /
 	ffmpeg.setFfmpegPath('/Users/XYK/Desktop/ffmpeg'); // Explicitly set ffmpeg and ffprobe paths
 	ffmpeg.setFfprobePath('/Users/XYK/Desktop/ffprobe');
 	_PORT = 8080;
-	_WS_PORT = 8080;
+	_WS_PORT = 8081;
 }
 
 
