@@ -175,7 +175,6 @@ function hlsTranscode(req, res, next) {
 		    callback();
 		})
 		.saveToFile(_OUTPUT_PATH + '/360p_850k.m3u8');
-
 	}
 
 	SD_240P_TRANSCODE = function(filename, callback) {
@@ -213,12 +212,31 @@ function hlsTranscode(req, res, next) {
 		    callback();
 		})
 		.saveToFile(_OUTPUT_PATH + '/240p_400k.m3u8');
-
 	}
 
 	CREATE_INDEX_M3U8 = function() {
 		fs.createReadStream('index.m3u8').pipe(fs.createWriteStream(_OUTPUT_PATH + '/index.m3u8'));
 	}
+
+	CREATE_THUMBNAILS = function(filename, callback) {
+		ffmpeg(filename)
+		  .on('filenames', function(filenames) {
+		    console.log('Will generate ' + filenames.join(', '))
+		  })
+		  .on('end', function() {
+		  	_transcodedRenditionsCount++;
+		    console.log('Screenshots taken');
+		  })
+		  .screenshots({
+		    // Will take screens at 20%, 40%, 60% and 80% of the video
+		    count: 5,
+		    folder: _OUTPUT_PATH,
+		    filename: 'thumbnail_%s_%00i_%r.jpg',
+		    size: '640x360'
+		  });
+	}
+
+
 
 	res.send({status: 0, message: "Beginning transcode", file: req.params.filename});
 
@@ -240,7 +258,7 @@ function hlsTranscode(req, res, next) {
 		console.log(JSON.stringify(_ret))
 		wss.broadcast(JSON.stringify(_ret));
 
-		fs.emptyDir(_OUTPUT_PATH, err => {
+		fs.emptyDir(_OUTPUT_PATH, err => { // Clear out output path of old m3u8 files
 			if (err) return console.error(err);
 
 		  	CREATE_INDEX_M3U8();
@@ -248,14 +266,15 @@ function hlsTranscode(req, res, next) {
 		  	SD_480P_TRANSCODE(req.params.filename, uploadToGCS);
 		  	SD_360P_TRANSCODE(req.params.filename, uploadToGCS);
 		  	SD_240P_TRANSCODE(req.params.filename, uploadToGCS);
+		  	CREATE_THUMBNAILS(req.params.filename, uploadToGCS);
 		});
 
 
 	});
 
-	// Will not execute until all 4
+	// Will not execute until all 5
 	function uploadToGCS() {
-		if(_transcodedRenditionsCount != 4) return;
+		if(_transcodedRenditionsCount != 5) return;
 		_transcodeInProgress = false; // End transcode in progress flag
 
 		dir.files(_OUTPUT_PATH, function(err, files) {
@@ -265,7 +284,7 @@ function hlsTranscode(req, res, next) {
 			_uploaded_files_count = 0; // Use this rather than index because indexes are called asynchronously
 
 			files.forEach(function(file, index) {
-				if(path.extname(file) === '.m3u8' || path.extname(file) === '.ts') { // Only upload M3U8s and transport streams
+				if(path.extname(file) === '.m3u8' || path.extname(file) === '.ts' || path.extname(file) === '.jpg') { // Only upload M3U8s and transport streams
 
 					var _options = { // GCS destination bucket folder and file paths
 					  destination: path.basename(req.params.filename, '.mp4') + '/' + path.basename(file) // Directory of /filenamewithoutextension/file
@@ -281,15 +300,18 @@ function hlsTranscode(req, res, next) {
 							var metadata = {
 								contentType: 'application/x-mpegURL'
 							};
-						} else {
+						} else if(gFileObj.name.indexOf('.ts') != -1) {
 							var metadata = {
 								contentType: 'video/MP2T'
 							};
+						} else {
+							var metadata = {
+								contentType: 'image/jpeg'
+							}
 						}
 
 						gFileObj.setMetadata(metadata, function(err, apiResponse) {});
 						_uploaded_files_count++;
-
 
 						_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': _uploaded_files_count, 'totalCount': _total_files_count};
 						wss.broadcast(JSON.stringify(_ret));
