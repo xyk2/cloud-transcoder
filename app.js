@@ -71,7 +71,7 @@ function hlsTranscode(req, res, next) {
 		.audioBitrate('96k')
 		.size('1280x720')
 		.on('start', function(commandLine) {
-			_ret = {'event': 'start', 'rendition': '720P_3000K', 'command': commandLine};
+			_ret = {'event': 'start_m3u8', 'rendition': '720P_3000K', 'command': commandLine};
 
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
@@ -92,13 +92,28 @@ function hlsTranscode(req, res, next) {
 			wss.broadcast(JSON.stringify(_ret));
 		})
 		.on('end', function(stdout, stderr) {
-			_ret = {'event': 'success', 'rendition': '720P_3000K'};
-
+			_ret = {'event': 'complete_m3u8', 'rendition': '720P_3000K'};
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
 
-		    _transcodedRenditionsCount++;
-		    callback();
+    	    ffmpeg(_OUTPUT_PATH + '/720p_3000k.m3u8') // Concatenate M3U8 playlist into MP4 with moovatom at front
+    	    .outputOptions('-c', 'copy')
+    	    .outputOptions('-bsf:a', 'aac_adtstoasc')
+    	   	.outputOptions('-movflags', '+faststart')
+    	   	.on('start', function(commandLine) {
+    	   		_ret = {'event': 'start_mp4', 'rendition': '720P_3000K', 'command': commandLine};
+    	   		wss.broadcast(JSON.stringify(_ret));
+    	   	    console.log(JSON.stringify(_ret));
+    	   	})
+    	   	.on('end', function(stdout, stderr) {
+       			_ret = {'event': 'complete_mp4', 'rendition': '720P_3000K'};
+       			wss.broadcast(JSON.stringify(_ret));
+       		    console.log(JSON.stringify(_ret));
+       		    _transcodedRenditionsCount++;
+       		    callback();
+    	   	})
+    	   	.saveToFile(_OUTPUT_PATH + '/720p_3000k.mp4')
+
 		})
 		.saveToFile(_OUTPUT_PATH + '/720p_3000k.m3u8');
 	}
@@ -109,7 +124,7 @@ function hlsTranscode(req, res, next) {
 		.audioBitrate('96k')
 		.size('854x480')
 		.on('start', function(commandLine) {
-			_ret = {'event': 'start', 'rendition': '480P_1500K', 'command': commandLine};
+			_ret = {'event': 'start_m3u8', 'rendition': '480P_1500K', 'command': commandLine};
 
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
@@ -129,13 +144,28 @@ function hlsTranscode(req, res, next) {
 			wss.broadcast(JSON.stringify(_ret));
 		})
 		.on('end', function(stdout, stderr) {
-			_ret = {'event': 'success', 'rendition': '480P_1500K'};
-
+			_ret = {'event': 'complete_m3u8', 'rendition': '480P_1500K'};
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
 
-		    _transcodedRenditionsCount++;
-		    callback();
+		    ffmpeg(_OUTPUT_PATH + '/480p_1500k.m3u8') // Concatenate M3U8 playlist into MP4 with moovatom at front
+		    .outputOptions('-c', 'copy')
+		    .outputOptions('-bsf:a', 'aac_adtstoasc')
+		   	.outputOptions('-movflags', '+faststart')
+		   	.on('start', function(commandLine) {
+		   		_ret = {'event': 'start_mp4', 'rendition': '480P_1500K', 'command': commandLine};
+		   		wss.broadcast(JSON.stringify(_ret));
+		   	    console.log(JSON.stringify(_ret));
+		   	})
+		   	.on('end', function(stdout, stderr) {
+	   			_ret = {'event': 'complete_mp4', 'rendition': '480P_1500K'};
+	   			wss.broadcast(JSON.stringify(_ret));
+	   		    console.log(JSON.stringify(_ret));
+	   		    _transcodedRenditionsCount++;
+	   		    callback();
+		   	})
+		   	.saveToFile(_OUTPUT_PATH + '/480p_1500k.mp4')
+
 		})
 		.saveToFile(_OUTPUT_PATH + '/480p_1500k.m3u8');
 	}
@@ -146,7 +176,7 @@ function hlsTranscode(req, res, next) {
 		.audioBitrate('96k')
 		.size('640x360')
 		.on('start', function(commandLine) {
-			_ret = {'event': 'start', 'rendition': '360P_850K', 'command': commandLine};
+			_ret = {'event': 'start_m3u8', 'rendition': '360P_850K', 'command': commandLine};
 
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
@@ -166,13 +196,28 @@ function hlsTranscode(req, res, next) {
 			wss.broadcast(JSON.stringify(_ret));
 		})
 		.on('end', function(stdout, stderr) {
-			_ret = {'event': 'success', 'rendition': '360P_850K'};
-
+			_ret = {'event': 'complete_m3u8', 'rendition': '360P_850K'};
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
 
-		    _transcodedRenditionsCount++;
-		    callback();
+    	    ffmpeg(_OUTPUT_PATH + '/360p_850k.m3u8') // Concatenate M3U8 playlist into MP4 with moovatom at front
+    	    .outputOptions('-c', 'copy')
+    	    .outputOptions('-bsf:a', 'aac_adtstoasc')
+    	   	.outputOptions('-movflags', '+faststart')
+    	   	.on('start', function(commandLine) {
+    	   		_ret = {'event': 'start_mp4', 'rendition': '360P_850K', 'command': commandLine};
+    	   		wss.broadcast(JSON.stringify(_ret));
+    	   	    console.log(JSON.stringify(_ret));
+    	   	})
+    	   	.on('end', function(stdout, stderr) {
+       			_ret = {'event': 'complete_mp4', 'rendition': '360P_850K'};
+       			wss.broadcast(JSON.stringify(_ret));
+       		    console.log(JSON.stringify(_ret));
+       		    _transcodedRenditionsCount++;
+       		    callback();
+    	   	})
+    	   	.saveToFile(_OUTPUT_PATH + '/360p_850k.mp4')
+
 		})
 		.saveToFile(_OUTPUT_PATH + '/360p_850k.m3u8');
 	}
@@ -183,7 +228,7 @@ function hlsTranscode(req, res, next) {
 		.audioBitrate('96k')
 		.size('352x240')
 		.on('start', function(commandLine) {
-			_ret = {'event': 'start', 'rendition': '240P_400K', 'command': commandLine};
+			_ret = {'event': 'start_m3u8', 'rendition': '240P_400K', 'command': commandLine};
 
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
@@ -203,13 +248,31 @@ function hlsTranscode(req, res, next) {
 			wss.broadcast(JSON.stringify(_ret));
 		})
 		.on('end', function(stdout, stderr) {
-			_ret = {'event': 'success', 'rendition': '240P_400K'};
-
+			_ret = {'event': 'complete_m3u8', 'rendition': '240P_400K'};
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
 
-		    _transcodedRenditionsCount++;
-		    callback();
+		    ffmpeg(_OUTPUT_PATH + '/240p_400k.m3u8') // Concatenate M3U8 playlist into MP4 with moovatom at front
+		    .outputOptions('-c', 'copy')
+		    .outputOptions('-bsf:a', 'aac_adtstoasc')
+		   	.outputOptions('-movflags', '+faststart')
+		   	.on('start', function(commandLine) {
+		   		_ret = {'event': 'start_mp4', 'rendition': '240P_400K', 'command': commandLine};
+		   		wss.broadcast(JSON.stringify(_ret));
+		   	    console.log(JSON.stringify(_ret));
+		   	})
+		   	.on('error', function(err, stdout, stderr) {
+		   		console.log(err.message);
+		   	})
+		   	.on('end', function(stdout, stderr) {
+	   			_ret = {'event': 'complete_mp4', 'rendition': '240P_400K'};
+	   			wss.broadcast(JSON.stringify(_ret));
+	   		    console.log(JSON.stringify(_ret));
+	   		    _transcodedRenditionsCount++;
+	   		    callback();
+		   	})
+		   	.saveToFile(_OUTPUT_PATH + '/240p_400k.mp4')
+
 		})
 		.saveToFile(_OUTPUT_PATH + '/240p_400k.m3u8');
 	}
@@ -284,7 +347,7 @@ function hlsTranscode(req, res, next) {
 			_uploaded_files_count = 0; // Use this rather than index because indexes are called asynchronously
 
 			files.forEach(function(file, index) {
-				if(path.extname(file) === '.m3u8' || path.extname(file) === '.ts' || path.extname(file) === '.jpg') { // Only upload M3U8s and transport streams
+				if(path.extname(file) === '.m3u8' || path.extname(file) === '.ts' || path.extname(file) === '.jpg' || path.extname(file) === '.mp4') { // Only upload M3U8s and transport streams
 
 					var _options = { // GCS destination bucket folder and file paths
 					  destination: path.basename(req.params.filename, '.mp4') + '/' + path.basename(file) // Directory of /filenamewithoutextension/file
@@ -297,17 +360,13 @@ function hlsTranscode(req, res, next) {
 						}
 
 						if(gFileObj.name.indexOf('.m3u8') != -1) {
-							var metadata = {
-								contentType: 'application/x-mpegURL'
-							};
+							var metadata = { contentType: 'application/x-mpegURL' };
 						} else if(gFileObj.name.indexOf('.ts') != -1) {
-							var metadata = {
-								contentType: 'video/MP2T'
-							};
+							var metadata = { contentType: 'video/MP2T' };
+						} else if(gFileObj.name.indexOf('.jpg') != -1) {
+							var metadata = { contentType: 'image/jpeg' };
 						} else {
-							var metadata = {
-								contentType: 'image/jpeg'
-							}
+							var metadata = { contentType: 'video/mp4' };
 						}
 
 						gFileObj.setMetadata(metadata, function(err, apiResponse) {});
@@ -322,6 +381,15 @@ function hlsTranscode(req, res, next) {
 		});
 	}
 }
+
+
+
+
+
+
+
+
+
 
 function thumbnailsTranscode(req, res, next) {
 	if(!req.params.filename) {
