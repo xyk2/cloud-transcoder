@@ -6,6 +6,7 @@ var dir = require('node-dir');
 var path = require('path');
 var request = require('request');
 
+
 var google_cloud = require('google-cloud')({
 	projectId: 'broadcast-cx',
 	keyFilename: 'keys/broadcast-cx-bda0296621a4.json'
@@ -19,7 +20,17 @@ var server = restify.createServer({
 	name: 'ffmpeg-runner'
 });
 
-if(process.env.PWD == '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner') { // If there is a response from metadata server, means it is running on GCS
+server.pre(restify.pre.sanitizePath());
+server.use(restify.acceptParser(server.acceptable));
+server.use(restify.queryParser({ mapParams: false })); // Parses URL queries, i.e. ?name=hello&gender=male
+server.use(restify.bodyParser());
+server.use(restify.gzipResponse()); // Gzip by default if accept-encoding: gzip is set on request
+server.pre(restify.CORS()); // Enable CORS headers
+server.use(restify.fullResponse());
+
+
+// Semi-Hack: If environment path is same as GCS, then assume from GCS
+if(process.env.PWD == '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner') {
 	_OUTPUT_PATH = '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_outputs';
 	_PRESETS_PATH = '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/presets';
 	_PORT = 8080; // 8080 forwarded to 80 with iptables rule
@@ -46,8 +57,7 @@ wss.broadcast = function broadcast(data) {
 
 _transcodeInProgress = false;
 
-server.get('/transcode/hls/:filename', hlsTranscode);
-server.get('/transcode/thumbnails/:filename', thumbnailsTranscode);
+server.post('/transcode/hls/:filename', hlsTranscode);
 
 
 function hlsTranscode(req, res, next) {
@@ -63,13 +73,21 @@ function hlsTranscode(req, res, next) {
 	}
 
 	_transcodeInProgress = true;
-	_transcodedRenditionsCount = 0;	
+	_transcodedRenditionsCount = 0;
+	_trimmingOptions = [];
+
+	if(req.body.startTime && req.body.endTime && req.body.endTime > req.body.startTime) {
+		// If there is a startTime parameter and an endTime parameter, modify _trimmingOptions -ss (start) and -t (duration)
+		_trimmingOptions = [['-ss', req.body.startTime, '-t', req.body.endTime - req.body.startTime].join(' ')];
+		console.log(_trimmingOptions);
+	}
 
 	HD_720P_TRANSCODE = function(filename, callback) { 
 		_HD_720P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 		.videoBitrate(3000)
 		.audioBitrate('96k')
 		.size('1280x720')
+		.inputOptions(_trimmingOptions)
 		.on('start', function(commandLine) {
 			_ret = {'event': 'start_m3u8', 'rendition': '720P_3000K', 'command': commandLine};
 
@@ -123,6 +141,7 @@ function hlsTranscode(req, res, next) {
 		.videoBitrate(1500)
 		.audioBitrate('96k')
 		.size('854x480')
+		.inputOptions(_trimmingOptions)
 		.on('start', function(commandLine) {
 			_ret = {'event': 'start_m3u8', 'rendition': '480P_1500K', 'command': commandLine};
 
@@ -175,6 +194,7 @@ function hlsTranscode(req, res, next) {
 		.videoBitrate(850)
 		.audioBitrate('96k')
 		.size('640x360')
+		.inputOptions(_trimmingOptions)
 		.on('start', function(commandLine) {
 			_ret = {'event': 'start_m3u8', 'rendition': '360P_850K', 'command': commandLine};
 
@@ -227,6 +247,7 @@ function hlsTranscode(req, res, next) {
 		.videoBitrate(400)
 		.audioBitrate('96k')
 		.size('352x240')
+		.inputOptions(_trimmingOptions)
 		.on('start', function(commandLine) {
 			_ret = {'event': 'start_m3u8', 'rendition': '240P_400K', 'command': commandLine};
 
@@ -283,20 +304,24 @@ function hlsTranscode(req, res, next) {
 
 	CREATE_THUMBNAILS = function(filename, callback) {
 		ffmpeg(filename)
-		  .on('filenames', function(filenames) {
-		    console.log('Will generate ' + filenames.join(', '))
-		  })
-		  .on('end', function() {
-		  	_transcodedRenditionsCount++;
-		    console.log('Screenshots taken');
-		  })
-		  .screenshots({
-		    // Will take screens at 20%, 40%, 60% and 80% of the video
-		    count: 5,
-		    folder: _OUTPUT_PATH,
-		    filename: 'thumbnail_%s_%00i_%r.jpg',
-		    size: '640x360'
-		  });
+		  	.on('filenames', function(filenames) {
+				_ret = {'event': 'start_thumbnail', 'files': filenames};
+				wss.broadcast(JSON.stringify(_ret));
+				console.log(JSON.stringify(_ret));
+		  	})
+			.on('end', function() {
+				_transcodedRenditionsCount++;
+				_ret = {'event': 'complete_thumbnail'};
+				wss.broadcast(JSON.stringify(_ret));
+				console.log(JSON.stringify(_ret));
+			})
+			.screenshots({
+				// Will take screens at 20%, 40%, 60% and 80% of the video
+				count: 5,
+				folder: _OUTPUT_PATH,
+				filename: 'thumbnail_%s_%00i_%r.jpg',
+				size: '640x360'
+			});
 	}
 
 
@@ -391,35 +416,6 @@ function hlsTranscode(req, res, next) {
 
 
 
-function thumbnailsTranscode(req, res, next) {
-	if(!req.params.filename) {
-		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Invalid request.'}));
-		res.send(400, {status: 1, message: "Invalid Request."});
-		return;
-	}
-
-	THUMBNAIL_TRANSCODE = function(filename, callback) {
-		ffmpeg(filename)
-		  .on('filenames', function(filenames) {
-		    console.log('Will generate ' + filenames.join(', '))
-		  })
-		  .on('end', function() {
-		    console.log('Screenshots taken');
-		  })
-		  .screenshots({
-		    // Will take screens at 20%, 40%, 60% and 80% of the video
-		    count: 5,
-		    folder: _OUTPUT_PATH,
-		    filename: 'thumbnail_%s_%00i_%r.jpg',
-		    size: '1280x720'
-		  });
-	}
-
-
-	res.send({status: 0, message: "Beginning transcode", file: req.params.filename});
-
-	THUMBNAIL_TRANSCODE(req.params.filename);
-}
 
 
 
