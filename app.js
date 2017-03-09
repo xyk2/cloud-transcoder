@@ -47,6 +47,7 @@ wss.broadcast = function broadcast(data) {
 _transcodeInProgress = false;
 
 server.get('/transcode/hls/:filename', hlsTranscode);
+server.get('/transcode/thumbnails/:filename', thumbnailsTranscode);
 
 
 function hlsTranscode(req, res, next) {
@@ -69,7 +70,6 @@ function hlsTranscode(req, res, next) {
 		.videoBitrate(3000)
 		.audioBitrate('96k')
 		.size('1280x720')
-		.saveToFile(_OUTPUT_PATH + '/720p_3000k.m3u8')
 		.on('start', function(commandLine) {
 			_ret = {'event': 'start', 'rendition': '720P_3000K', 'command': commandLine};
 
@@ -77,7 +77,7 @@ function hlsTranscode(req, res, next) {
 		    wss.broadcast(JSON.stringify(_ret));
 
 		})
-		.on('progress', function(progress) {			
+		.on('progress', function(progress) {
 			progress['event'] = 'progress';
 			progress['rendition'] = '720P_3000K';
 
@@ -85,7 +85,7 @@ function hlsTranscode(req, res, next) {
 			wss.broadcast(JSON.stringify(progress));
 		})
 		.on('stderr', function(stderrLine) {
-		    console.log('Stderr output: ' + stderrLine);
+		    //console.log('Stderr output: ' + stderrLine);
 		})
 		.on('error', function(err, stdout, stderr) {
 			_ret = {'event': 'error', 'message': err.message};
@@ -99,7 +99,8 @@ function hlsTranscode(req, res, next) {
 
 		    _transcodedRenditionsCount++;
 		    callback();
-		});
+		})
+		.saveToFile(_OUTPUT_PATH + '/720p_3000k.m3u8');
 	}
 
 	SD_480P_TRANSCODE = function(filename, callback) {
@@ -107,7 +108,6 @@ function hlsTranscode(req, res, next) {
 		.videoBitrate(1500)
 		.audioBitrate('96k')
 		.size('854x480')
-		.saveToFile(_OUTPUT_PATH + '/480p_1500k.m3u8')
 		.on('start', function(commandLine) {
 			_ret = {'event': 'start', 'rendition': '480P_1500K', 'command': commandLine};
 
@@ -136,7 +136,8 @@ function hlsTranscode(req, res, next) {
 
 		    _transcodedRenditionsCount++;
 		    callback();
-		});
+		})
+		.saveToFile(_OUTPUT_PATH + '/480p_1500k.m3u8');
 	}
 
 	SD_360P_TRANSCODE = function(filename, callback) {
@@ -144,7 +145,6 @@ function hlsTranscode(req, res, next) {
 		.videoBitrate(850)
 		.audioBitrate('96k')
 		.size('640x360')
-		.saveToFile(_OUTPUT_PATH + '/360p_850k.m3u8')
 		.on('start', function(commandLine) {
 			_ret = {'event': 'start', 'rendition': '360P_850K', 'command': commandLine};
 
@@ -173,7 +173,9 @@ function hlsTranscode(req, res, next) {
 
 		    _transcodedRenditionsCount++;
 		    callback();
-		});
+		})
+		.saveToFile(_OUTPUT_PATH + '/360p_850k.m3u8');
+
 	}
 
 	SD_240P_TRANSCODE = function(filename, callback) {
@@ -181,7 +183,6 @@ function hlsTranscode(req, res, next) {
 		.videoBitrate(400)
 		.audioBitrate('96k')
 		.size('352x240')
-		.saveToFile(_OUTPUT_PATH + '/240p_400k.m3u8')
 		.on('start', function(commandLine) {
 			_ret = {'event': 'start', 'rendition': '240P_400K', 'command': commandLine};
 
@@ -196,7 +197,7 @@ function hlsTranscode(req, res, next) {
 			wss.broadcast(JSON.stringify(progress));
 		})
 		.on('stderr', function(stderrLine) {
-		    console.log('Stderr output: ' + stderrLine);
+		    //console.log('Stderr output: ' + stderrLine);
 		})
 		.on('error', function(err, stdout, stderr) {
 			_ret = {'event': 'error', 'message': err.message};
@@ -210,7 +211,9 @@ function hlsTranscode(req, res, next) {
 
 		    _transcodedRenditionsCount++;
 		    callback();
-		});
+		})
+		.saveToFile(_OUTPUT_PATH + '/240p_400k.m3u8');
+
 	}
 
 	CREATE_INDEX_M3U8 = function() {
@@ -296,6 +299,36 @@ function hlsTranscode(req, res, next) {
 			});
 		});
 	}
+}
+
+function thumbnailsTranscode(req, res, next) {
+	if(!req.params.filename) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Invalid request.'}));
+		res.send(400, {status: 1, message: "Invalid Request."});
+		return;
+	}
+
+	THUMBNAIL_TRANSCODE = function(filename, callback) {
+		ffmpeg(filename)
+		  .on('filenames', function(filenames) {
+		    console.log('Will generate ' + filenames.join(', '))
+		  })
+		  .on('end', function() {
+		    console.log('Screenshots taken');
+		  })
+		  .screenshots({
+		    // Will take screens at 20%, 40%, 60% and 80% of the video
+		    count: 5,
+		    folder: _OUTPUT_PATH,
+		    filename: 'thumbnail_%s_%00i_%r.jpg',
+		    size: '1280x720'
+		  });
+	}
+
+
+	res.send({status: 0, message: "Beginning transcode", file: req.params.filename});
+
+	THUMBNAIL_TRANSCODE(req.params.filename);
 }
 
 

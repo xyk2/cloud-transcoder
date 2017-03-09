@@ -6,7 +6,7 @@
   "author": "Xiao Yang Kao",
   "license": "ISC",
   "dependencies": {
-    "fluent-ffmpeg": "2.0.1",
+    "fluent-ffmpeg": "^2.1.0",
     "fs-extra": "^2.0.0",
     "google-cloud": "0.45.0",
     "node-dir": "^0.1.16",
