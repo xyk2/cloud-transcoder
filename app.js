@@ -55,6 +55,12 @@ wss.broadcast = function broadcast(data) {
 	});
 };
 
+wss.on('connection', function connection(ws) {
+	ws.send(JSON.stringify({'event': 'success', 'message': 'Connected to ffmpeg-runner.'}));
+});
+
+
+
 _transcodeInProgress = false;
 
 server.post('/transcode/hls/:filename', hlsTranscode);
@@ -76,9 +82,19 @@ function hlsTranscode(req, res, next) {
 	_transcodedRenditionsCount = 0;
 	_trimmingOptions = [];
 
+	if(req.body.startTime > req.body.endTime) {
+		res.send(400, {status: 1, message: "Start time is after end time."});
+		_ret = {'event': 'error', 'message': 'Start time is after end time.'};
+		wss.broadcast(JSON.stringify(_ret));
+	}
 	if(req.body.startTime && req.body.endTime && req.body.endTime > req.body.startTime) {
 		// If there is a startTime parameter and an endTime parameter, modify _trimmingOptions -ss (start) and -t (duration)
-		_trimmingOptions = [['-ss', req.body.startTime, '-t', req.body.endTime - req.body.startTime].join(' ')];
+		_trimmingOptions = ['-ss ' + req.body.startTime, '-t ' + (req.body.endTime - req.body.startTime)];
+		console.log(_trimmingOptions);
+	}
+	if(req.body.startTime && !req.body.endTime) {
+		// If there is only a start time parameter, cut video from startTime
+		_trimmingOptions = ['-ss ' + req.body.startTime];
 		console.log(_trimmingOptions);
 	}
 
@@ -89,7 +105,7 @@ function hlsTranscode(req, res, next) {
 		.size('1280x720')
 		.inputOptions(_trimmingOptions)
 		.on('start', function(commandLine) {
-			_ret = {'event': 'start_m3u8', 'rendition': '720P_3000K', 'command': commandLine};
+			_ret = {'event': 'm3u8', 'status': 'start', 'rendition': '720P_3000K', 'command': commandLine};
 
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
@@ -110,7 +126,7 @@ function hlsTranscode(req, res, next) {
 			wss.broadcast(JSON.stringify(_ret));
 		})
 		.on('end', function(stdout, stderr) {
-			_ret = {'event': 'complete_m3u8', 'rendition': '720P_3000K'};
+			_ret = {'event': 'm3u8', 'status': 'complete', 'rendition': '720P_3000K'};
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
 
@@ -119,12 +135,12 @@ function hlsTranscode(req, res, next) {
     	    .outputOptions('-bsf:a', 'aac_adtstoasc')
     	   	.outputOptions('-movflags', '+faststart')
     	   	.on('start', function(commandLine) {
-    	   		_ret = {'event': 'start_mp4', 'rendition': '720P_3000K', 'command': commandLine};
+    	   		_ret = {'event': 'mp4', 'status': 'start', 'rendition': '720P_3000K', 'command': commandLine};
     	   		wss.broadcast(JSON.stringify(_ret));
     	   	    console.log(JSON.stringify(_ret));
     	   	})
     	   	.on('end', function(stdout, stderr) {
-       			_ret = {'event': 'complete_mp4', 'rendition': '720P_3000K'};
+       			_ret = {'event': 'mp4', 'status': 'complete', 'rendition': '720P_3000K'};
        			wss.broadcast(JSON.stringify(_ret));
        		    console.log(JSON.stringify(_ret));
        		    _transcodedRenditionsCount++;
@@ -143,7 +159,7 @@ function hlsTranscode(req, res, next) {
 		.size('854x480')
 		.inputOptions(_trimmingOptions)
 		.on('start', function(commandLine) {
-			_ret = {'event': 'start_m3u8', 'rendition': '480P_1500K', 'command': commandLine};
+			_ret = {'event': 'm3u8', 'status': 'start', 'rendition': '480P_1500K', 'command': commandLine};
 
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
@@ -163,7 +179,7 @@ function hlsTranscode(req, res, next) {
 			wss.broadcast(JSON.stringify(_ret));
 		})
 		.on('end', function(stdout, stderr) {
-			_ret = {'event': 'complete_m3u8', 'rendition': '480P_1500K'};
+			_ret = {'event': 'm3u8', 'status': 'complete', 'rendition': '480P_1500K'};
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
 
@@ -172,12 +188,12 @@ function hlsTranscode(req, res, next) {
 		    .outputOptions('-bsf:a', 'aac_adtstoasc')
 		   	.outputOptions('-movflags', '+faststart')
 		   	.on('start', function(commandLine) {
-		   		_ret = {'event': 'start_mp4', 'rendition': '480P_1500K', 'command': commandLine};
+		   		_ret = {'event': 'mp4', 'status': 'start', 'rendition': '480P_1500K', 'command': commandLine};
 		   		wss.broadcast(JSON.stringify(_ret));
 		   	    console.log(JSON.stringify(_ret));
 		   	})
 		   	.on('end', function(stdout, stderr) {
-	   			_ret = {'event': 'complete_mp4', 'rendition': '480P_1500K'};
+	   			_ret = {'event': 'mp4', 'status': 'complete', 'rendition': '480P_1500K'};
 	   			wss.broadcast(JSON.stringify(_ret));
 	   		    console.log(JSON.stringify(_ret));
 	   		    _transcodedRenditionsCount++;
@@ -196,7 +212,7 @@ function hlsTranscode(req, res, next) {
 		.size('640x360')
 		.inputOptions(_trimmingOptions)
 		.on('start', function(commandLine) {
-			_ret = {'event': 'start_m3u8', 'rendition': '360P_850K', 'command': commandLine};
+			_ret = {'event': 'm3u8', 'status': 'start', 'rendition': '360P_850K', 'command': commandLine};
 
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
@@ -216,7 +232,7 @@ function hlsTranscode(req, res, next) {
 			wss.broadcast(JSON.stringify(_ret));
 		})
 		.on('end', function(stdout, stderr) {
-			_ret = {'event': 'complete_m3u8', 'rendition': '360P_850K'};
+			_ret = {'event': 'm3u8', 'status': 'complete', 'rendition': '360P_850K'};
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
 
@@ -225,12 +241,12 @@ function hlsTranscode(req, res, next) {
     	    .outputOptions('-bsf:a', 'aac_adtstoasc')
     	   	.outputOptions('-movflags', '+faststart')
     	   	.on('start', function(commandLine) {
-    	   		_ret = {'event': 'start_mp4', 'rendition': '360P_850K', 'command': commandLine};
+    	   		_ret = {'event': 'mp4', 'status': 'start', 'rendition': '360P_850K', 'command': commandLine};
     	   		wss.broadcast(JSON.stringify(_ret));
     	   	    console.log(JSON.stringify(_ret));
     	   	})
     	   	.on('end', function(stdout, stderr) {
-       			_ret = {'event': 'complete_mp4', 'rendition': '360P_850K'};
+       			_ret = {'event': 'mp4', 'status': 'complete', 'rendition': '360P_850K'};
        			wss.broadcast(JSON.stringify(_ret));
        		    console.log(JSON.stringify(_ret));
        		    _transcodedRenditionsCount++;
@@ -249,7 +265,7 @@ function hlsTranscode(req, res, next) {
 		.size('352x240')
 		.inputOptions(_trimmingOptions)
 		.on('start', function(commandLine) {
-			_ret = {'event': 'start_m3u8', 'rendition': '240P_400K', 'command': commandLine};
+			_ret = {'event': 'm3u8', 'status': 'start', 'rendition': '240P_400K', 'command': commandLine};
 
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
@@ -269,7 +285,7 @@ function hlsTranscode(req, res, next) {
 			wss.broadcast(JSON.stringify(_ret));
 		})
 		.on('end', function(stdout, stderr) {
-			_ret = {'event': 'complete_m3u8', 'rendition': '240P_400K'};
+			_ret = {'event': 'm3u8', 'status': 'complete', 'rendition': '240P_400K'};
 		    console.log(JSON.stringify(_ret));
 		    wss.broadcast(JSON.stringify(_ret));
 
@@ -278,7 +294,7 @@ function hlsTranscode(req, res, next) {
 		    .outputOptions('-bsf:a', 'aac_adtstoasc')
 		   	.outputOptions('-movflags', '+faststart')
 		   	.on('start', function(commandLine) {
-		   		_ret = {'event': 'start_mp4', 'rendition': '240P_400K', 'command': commandLine};
+		   		_ret = {'event': 'mp4', 'status': 'start', 'rendition': '240P_400K', 'command': commandLine};
 		   		wss.broadcast(JSON.stringify(_ret));
 		   	    console.log(JSON.stringify(_ret));
 		   	})
@@ -286,7 +302,7 @@ function hlsTranscode(req, res, next) {
 		   		console.log(err.message);
 		   	})
 		   	.on('end', function(stdout, stderr) {
-	   			_ret = {'event': 'complete_mp4', 'rendition': '240P_400K'};
+	   			_ret = {'event': 'mp4', 'status': 'complete', 'rendition': '240P_400K'};
 	   			wss.broadcast(JSON.stringify(_ret));
 	   		    console.log(JSON.stringify(_ret));
 	   		    _transcodedRenditionsCount++;
@@ -305,15 +321,16 @@ function hlsTranscode(req, res, next) {
 	CREATE_THUMBNAILS = function(filename, callback) {
 		ffmpeg(filename)
 		  	.on('filenames', function(filenames) {
-				_ret = {'event': 'start_thumbnail', 'files': filenames};
+				_ret = {'event': 'thumbnail', 'status': 'start', 'files': filenames};
 				wss.broadcast(JSON.stringify(_ret));
 				console.log(JSON.stringify(_ret));
 		  	})
 			.on('end', function() {
 				_transcodedRenditionsCount++;
-				_ret = {'event': 'complete_thumbnail'};
+				_ret = {'event': 'thumbnail', 'status': 'complete'};
 				wss.broadcast(JSON.stringify(_ret));
 				console.log(JSON.stringify(_ret));
+				callback();
 			})
 			.screenshots({
 				// Will take screens at 20%, 40%, 60% and 80% of the video
@@ -326,21 +343,21 @@ function hlsTranscode(req, res, next) {
 
 
 
-	res.send({status: 0, message: "Beginning transcode", file: req.params.filename});
+	res.send({status: 0, message: "Starting transcode", file: req.params.filename});
 
-	_ret = {'event': 'download', 'status': 'begin', 'file': req.params.filename};
+	_ret = {'event': 'download', 'status': 'start', 'file': req.params.filename};
 	console.log(JSON.stringify(_ret))
 	wss.broadcast(JSON.stringify(_ret));
 
 	bucket.file(req.params.filename).download({
-	  destination: req.params.filename
+		destination: req.params.filename
 	}, function(err) {
-		if(err) {
+		if(err) { // Error handling (bucket file not found in GCS)
 			console.log(err.code, err.message);
 			wss.broadcast(JSON.stringify({'event': 'error', 'message': err.code + ' ' + err.message}));
 			res.send({status: 0, message: err.code + ' ' + err.message});
 			return;
-		} // Error handling (bucket file not found in GCS)
+		}
 
 		_ret = {'event': 'download', 'status': 'complete', 'file': req.params.filename};
 		console.log(JSON.stringify(_ret))
@@ -372,17 +389,15 @@ function hlsTranscode(req, res, next) {
 			_uploaded_files_count = 0; // Use this rather than index because indexes are called asynchronously
 
 			files.forEach(function(file, index) {
-				if(path.extname(file) === '.m3u8' || path.extname(file) === '.ts' || path.extname(file) === '.jpg' || path.extname(file) === '.mp4') { // Only upload M3U8s and transport streams
+				if(path.extname(file) === '.m3u8' || path.extname(file) === '.ts' || path.extname(file) === '.jpg' || path.extname(file) === '.mp4') {
+					// Only upload M3U8s and transport streams
 
 					var _options = { // GCS destination bucket folder and file paths
 					  destination: path.basename(req.params.filename, '.mp4') + '/' + path.basename(file) // Directory of /filenamewithoutextension/file
 					};
 
 					dest_bucket.upload(file, _options, function(err, gFileObj) {
-						if(err) { // Error handling
-							console.log(err);
-							return;
-						}
+						if(err) { return console.log(err); }
 
 						if(gFileObj.name.indexOf('.m3u8') != -1) {
 							var metadata = { contentType: 'application/x-mpegURL' };
@@ -402,6 +417,7 @@ function hlsTranscode(req, res, next) {
 						console.log(JSON.stringify(_ret));
 					});
 				}
+				
 			});
 		});
 	}
