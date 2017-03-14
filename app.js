@@ -82,11 +82,7 @@ function hlsTranscode(req, res, next) {
 	_transcodedRenditionsCount = 0;
 	_trimmingOptions = [];
 
-	if(req.body.startTime > req.body.endTime) {
-		res.send(400, {status: 1, message: "Start time is after end time."});
-		_ret = {'event': 'error', 'message': 'Start time is after end time.'};
-		wss.broadcast(JSON.stringify(_ret));
-	}
+
 	if(req.body.startTime && req.body.endTime && req.body.endTime > req.body.startTime) {
 		// If there is a startTime parameter and an endTime parameter, modify _trimmingOptions -ss (start) and -t (duration)
 		_trimmingOptions = ['-ss ' + req.body.startTime, '-t ' + (req.body.endTime - req.body.startTime)];
@@ -96,6 +92,12 @@ function hlsTranscode(req, res, next) {
 		// If there is only a start time parameter, cut video from startTime
 		_trimmingOptions = ['-ss ' + req.body.startTime];
 		console.log(_trimmingOptions);
+	}
+	if((req.body.startTime > req.body.endTime) && req.body.endTime) {
+		res.send(400, {status: 1, message: "Start time is after end time."});
+		_ret = {'event': 'error', 'message': 'Start time is after end time.'};
+		wss.broadcast(JSON.stringify(_ret));
+		return;
 	}
 
 	HD_720P_TRANSCODE = function(filename, callback) { 
@@ -344,6 +346,11 @@ function hlsTranscode(req, res, next) {
 
 
 	res.send({status: 0, message: "Starting transcode", file: req.params.filename});
+	wss.broadcast(JSON.stringify({'event': 'gcsupload', 'uploadedCount': 0, 'totalCount': 0}));
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '240P_400K'}));
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '360P_850K'}));
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '480P_1500K'}));
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '720P_3000K'}));
 
 	_ret = {'event': 'download', 'status': 'start', 'file': req.params.filename};
 	console.log(JSON.stringify(_ret))
@@ -354,8 +361,8 @@ function hlsTranscode(req, res, next) {
 	}, function(err) {
 		if(err) { // Error handling (bucket file not found in GCS)
 			console.log(err.code, err.message);
-			wss.broadcast(JSON.stringify({'event': 'error', 'message': err.code + ' ' + err.message}));
-			res.send({status: 0, message: err.code + ' ' + err.message});
+			wss.broadcast(JSON.stringify({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message}));
+			res.send({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message});
 			return;
 		}
 
