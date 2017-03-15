@@ -400,7 +400,8 @@ function hlsTranscode(req, res, next) {
 					// Only upload M3U8s and transport streams
 
 					var _options = { // GCS destination bucket folder and file paths
-					  destination: path.basename(req.params.filename, '.mp4') + '/' + path.basename(file) // Directory of /filenamewithoutextension/file
+						validation: false,
+						destination: path.basename(req.params.filename, '.mp4') + '/' + path.basename(file) // Directory of /filenamewithoutextension/file
 					};
 
 					dest_bucket.upload(file, _options, function(err, gFileObj) {
