@@ -395,6 +395,7 @@ function hlsTranscode(req, res, next) {
 			 		// Only upload M3U8s and transport streams
 
 			 		var _options = { // GCS destination bucket folder and file paths
+			 			resumable: false, // Disable resumable uploads (default is true for files >5MB). Socket hangup issues fix
 			 			validation: false, // Disable crc32/md5 checksum validation 
 			 			destination: _GCS_BASEPATH + path.basename(file) // Directory of /filenamewithoutextension/file
 			 		};
