@@ -394,34 +394,37 @@ function hlsTranscode(req, res, next) {
 			 		if(path.extname(file) != '.m3u8' && path.extname(file) != '.ts' && path.extname(file) != '.jpg' && path.extname(file) != '.mp4') return;
 			 		// Only upload M3U8s and transport streams
 
-			 		var _options = { // GCS destination bucket folder and file paths
-			 			resumable: false, // Disable resumable uploads (default is true for files >5MB). Socket hangup issues fix
-			 			validation: false, // Disable crc32/md5 checksum validation 
-			 			destination: _GCS_BASEPATH + path.basename(file) // Directory of /filenamewithoutextension/file
-			 		};
+			 		setTimeout(function() { // Sequence file uploads every 10ms to avoid socket timeouts
+			 			
+			 			var _options = { // GCS destination bucket folder and file paths
+			 				resumable: false, // Disable resumable uploads (default is true for files >5MB). Socket hangup issues fix
+			 				validation: false, // Disable crc32/md5 checksum validation 
+			 				destination: _GCS_BASEPATH + path.basename(file) // Directory of /filenamewithoutextension/file
+			 			};
 
-			 		dest_bucket.upload(file, _options, function(err, gFileObj) {
-			 			if(err) { return console.log(err); }
+			 			dest_bucket.upload(file, _options, function(err, gFileObj) {
+			 				if(err) { return console.log(err); }
 
-			 			if(gFileObj.name.indexOf('.m3u8') != -1) {
-			 				var metadata = { contentType: 'application/x-mpegURL' };
-			 			} else if(gFileObj.name.indexOf('.ts') != -1) {
-			 				var metadata = { contentType: 'video/MP2T' };
-			 			} else if(gFileObj.name.indexOf('.jpg') != -1) {
-			 				var metadata = { contentType: 'image/jpeg' };
-			 			} else {
-			 				var metadata = { contentType: 'video/mp4' };
-			 			}
+			 				if(gFileObj.name.indexOf('.m3u8') != -1) {
+			 					var metadata = { contentType: 'application/x-mpegURL' };
+			 				} else if(gFileObj.name.indexOf('.ts') != -1) {
+			 					var metadata = { contentType: 'video/MP2T' };
+			 				} else if(gFileObj.name.indexOf('.jpg') != -1) {
+			 					var metadata = { contentType: 'image/jpeg' };
+			 				} else {
+			 					var metadata = { contentType: 'video/mp4' };
+			 				}
 
-			 			gFileObj.setMetadata(metadata, function(err, apiResponse) {});
-			 			_uploaded_files_count++;
+			 				gFileObj.setMetadata(metadata, function(err, apiResponse) {});
+			 				_uploaded_files_count++;
 
-			 			_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': _uploaded_files_count, 'totalCount': _total_files_count};
-			 			wss.broadcast(JSON.stringify(_ret));
+			 				_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': _uploaded_files_count, 'totalCount': _total_files_count};
+			 				wss.broadcast(JSON.stringify(_ret));
 
-			 			postToBroadcastCXLibrary(_uploaded_files_count, _total_files_count, body.uuid);
-			 		});
-			 	
+			 				postToBroadcastCXLibrary(_uploaded_files_count, _total_files_count, body.uuid);
+			 			});
+			 			
+			 		}, _uploaded_files_count * 10);
 			 		
 			 	});
 			 });
