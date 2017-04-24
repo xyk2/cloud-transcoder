@@ -395,7 +395,6 @@ function hlsTranscode(req, res, next) {
 			 		// Only upload M3U8s and transport streams
 
 			 		setTimeout(function() { // Sequence file uploads every 10ms to avoid socket timeouts
-			 			
 			 			var _options = { // GCS destination bucket folder and file paths
 			 				resumable: false, // Disable resumable uploads (default is true for files >5MB). Socket hangup issues fix
 			 				validation: false, // Disable crc32/md5 checksum validation 
@@ -424,7 +423,7 @@ function hlsTranscode(req, res, next) {
 			 				postToBroadcastCXLibrary(_uploaded_files_count, _total_files_count, body.uuid);
 			 			});
 			 			
-			 		}, _uploaded_files_count * 10);
+			 		}, index * 10);
 			 		
 			 	});
 			 });
