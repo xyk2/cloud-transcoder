@@ -339,28 +339,7 @@ function hlsTranscode(req, res, next) {
 			});
 	}
 
-
-
-	res.send({status: 0, message: "Starting transcode", file: req.params.filename});
-	wss.broadcast(JSON.stringify({'event': 'gcsupload', 'uploadedCount': 0, 'totalCount': 0}));
-	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '240P_400K'}));
-	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '360P_850K'}));
-	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '480P_1500K'}));
-	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '720P_3000K'}));
-
-	wss.broadcast(JSON.stringify({'event': 'download', 'status': 'start', 'file': req.params.filename}));
-
-	bucket.file(req.params.filename).download({
-		destination: req.params.filename
-	}, function(err) {
-		if(err) { // Error handling (bucket file not found in GCS)
-			wss.broadcast(JSON.stringify({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message}));
-			res.send({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message});
-			return;
-		}
-
-		wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': req.params.filename}));
-
+	BEGIN_TRANSCODES = function() {
 		fs.emptyDir(_OUTPUT_PATH, err => { // Clear out output path of old m3u8 files
 			if (err) return console.error(err);
 
@@ -371,9 +350,35 @@ function hlsTranscode(req, res, next) {
 		  	SD_240P_TRANSCODE(req.params.filename, uploadToGCS);
 		  	CREATE_THUMBNAILS(req.params.filename, uploadToGCS);
 		});
+	}
+
+	res.send({status: 0, message: "Starting transcode", file: req.params.filename});
+	wss.broadcast(JSON.stringify({'event': 'gcsupload', 'uploadedCount': 0, 'totalCount': 0}));
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '240P_400K'}));
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '360P_850K'}));
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '480P_1500K'}));
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '720P_3000K'}));
+	wss.broadcast(JSON.stringify({'event': 'download', 'status': 'start', 'file': req.params.filename}));
 
 
-	});
+	if(fs.existsSync(req.params.filename)) { // If file already downloaded in local directory, use that instead of downloading again
+		wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': req.params.filename}));
+		BEGIN_TRANSCODES();
+	} else {
+		bucket.file(req.params.filename).download({
+			destination: req.params.filename
+		}, function(err) {
+			if(err) { // Error handling (bucket file not found in GCS)
+				wss.broadcast(JSON.stringify({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message}));
+				res.send({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message});
+				return;
+			}
+
+			BEGIN_TRANSCODES();
+			wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': req.params.filename}));
+		});
+	}
+
 
 	// Will not execute until all 5
 	function uploadToGCS() {
