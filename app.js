@@ -67,7 +67,7 @@ wss.on('connection', function connection(ws) {
 _transcodeInProgress = false;
 
 server.post('/transcode/hls/:filename', hlsTranscode);
-server.get('/debugUpload', debugUpload);
+//server.get('/debugUpload', debugUpload);
 
 
 function hlsTranscode(req, res, next) {
@@ -380,7 +380,7 @@ function hlsTranscode(req, res, next) {
 		if(_transcodedRenditionsCount != 5) return;
 		_transcodeInProgress = false; // End transcode in progress flag
 
-		function gcs_upload(file, options) {
+		function gcs_upload(file, options, uuid) {
 			dest_bucket.upload(file, options, function(err, gFileObj) {
 				if(err) { 
 					//return console.log(err);
@@ -405,7 +405,7 @@ function hlsTranscode(req, res, next) {
 				_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': _uploaded_files_count, 'totalCount': _total_files_count};
 				wss.broadcast(JSON.stringify(_ret));
 
-				postToBroadcastCXLibrary(_uploaded_files_count, _total_files_count, body.uuid);
+				postToBroadcastCXLibrary(_uploaded_files_count, _total_files_count, uuid);
 			});
 		}
 
@@ -430,9 +430,9 @@ function hlsTranscode(req, res, next) {
 			 				destination: _GCS_BASEPATH + path.basename(file) // Directory of /filenamewithoutextension/file
 			 			};
 
-			 			gcs_upload(file, _options);
+			 			gcs_upload(file, _options, body.uuid);
 
-			 		}, index * 10);
+			 		}, index * 5);
 			 		
 			 	});
 			 });
@@ -442,6 +442,7 @@ function hlsTranscode(req, res, next) {
 
 	function postToBroadcastCXLibrary(uploadedCount, totalCount, uuid) {
 		if(uploadedCount != totalCount) return;
+		console.log("postToBroadcastCXLibrary");
 
 		_POST_BODY = req.body.api;
 		_POST_BODY['masterPlaylistUrl'] = 'https://storage.googleapis.com/cx-video-content/' + _GCS_BASEPATH + 'index.m3u8';
