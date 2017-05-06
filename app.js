@@ -473,7 +473,7 @@ function hlsTranscode(req, res, next) {
 
 function debugUpload(req, res, next) {
 		function gcs_upload(file, options, count) {
-			dest_bucket.upload(file, _options, function(err, gFileObj) {
+			dest_bucket.upload(file, options, function(err, gFileObj) {
 				if(err) { 
 					//return console.log(err);
 					gcs_upload(file, options); // retry if error
