@@ -385,7 +385,7 @@ function hlsTranscode(req, res, next) {
 				if(err) { 
 					//return console.log(err);
 					console.log("File upload failed for " + file + ", trying again.");
-					gcs_upload(file, options); // retry if error
+					gcs_upload(file, options, uuid); // retry if error
 					return;
 				}
 
@@ -432,7 +432,7 @@ function hlsTranscode(req, res, next) {
 
 			 			gcs_upload(file, _options, body.uuid);
 
-			 		}, index * 5);
+			 		}, index * 10);
 			 		
 			 	});
 			 });
