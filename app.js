@@ -108,7 +108,7 @@ function hlsTranscode(req, res, next) {
 	HD_720P_TRANSCODE = function(filename, callback) { 
 		_HD_720P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 		.videoBitrate(3000)
-		.audioBitrate('96k')
+		//.audioBitrate('96k')
 		.size('1280x720')
 		.inputOptions(_trimmingOptions)
 		.on('start', function(commandLine) {
@@ -159,7 +159,7 @@ function hlsTranscode(req, res, next) {
 	SD_480P_TRANSCODE = function(filename, callback) {
 		_SD_480P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 		.videoBitrate(1500)
-		.audioBitrate('96k')
+		//.audioBitrate('96k')
 		.size('854x480')
 		.inputOptions(_trimmingOptions)
 		.on('start', function(commandLine) {
@@ -209,7 +209,7 @@ function hlsTranscode(req, res, next) {
 	SD_360P_TRANSCODE = function(filename, callback) {
 		_SD_360P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 		.videoBitrate(850)
-		.audioBitrate('96k')
+		//.audioBitrate('96k')
 		.size('640x360')
 		.inputOptions(_trimmingOptions)
 		.on('start', function(commandLine) {
@@ -259,7 +259,7 @@ function hlsTranscode(req, res, next) {
 	SD_240P_TRANSCODE = function(filename, callback) {
 		_SD_240P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 		.videoBitrate(400)
-		.audioBitrate('96k')
+		//.audioBitrate('96k')
 		.size('352x240')
 		.inputOptions(_trimmingOptions)
 		.on('start', function(commandLine) {
