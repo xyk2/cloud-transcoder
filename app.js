@@ -380,6 +380,33 @@ function hlsTranscode(req, res, next) {
 		if(_transcodedRenditionsCount != 5) return;
 		_transcodeInProgress = false; // End transcode in progress flag
 
+		function gcs_upload(file, options, count) {
+			dest_bucket.upload(file, _options, function(err, gFileObj) {
+				if(err) { 
+					//return console.log(err);
+					gcs_upload(file, options); // retry if error
+				}
+
+				if(gFileObj.name.indexOf('.m3u8') != -1) {
+					var metadata = { contentType: 'application/x-mpegURL' };
+				} else if(gFileObj.name.indexOf('.ts') != -1) {
+					var metadata = { contentType: 'video/MP2T' };
+				} else if(gFileObj.name.indexOf('.jpg') != -1) {
+					var metadata = { contentType: 'image/jpeg' };
+				} else {
+					var metadata = { contentType: 'video/mp4' };
+				}
+
+				gFileObj.setMetadata(metadata, function(err, apiResponse) {});
+				count++;
+
+				_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': count, 'totalCount': _total_files_count};
+				wss.broadcast(JSON.stringify(_ret));
+
+				postToBroadcastCXLibrary(count, _total_files_count, body.uuid);
+			});
+		}
+
 		request.post({uri: _API_HOST + '/videos', json: req.body.api}, function(err, response, body) {
 			if (err) return console.error(err);
 			_GCS_BASEPATH = path.basename(req.params.filename, '.mp4') + '/' + body.uuid + '/';
@@ -401,28 +428,8 @@ function hlsTranscode(req, res, next) {
 			 				destination: _GCS_BASEPATH + path.basename(file) // Directory of /filenamewithoutextension/file
 			 			};
 
-			 			dest_bucket.upload(file, _options, function(err, gFileObj) {
-			 				if(err) { return console.log(err); }
+			 			gcs_upload(file, _options, __uploaded_files_count);
 
-			 				if(gFileObj.name.indexOf('.m3u8') != -1) {
-			 					var metadata = { contentType: 'application/x-mpegURL' };
-			 				} else if(gFileObj.name.indexOf('.ts') != -1) {
-			 					var metadata = { contentType: 'video/MP2T' };
-			 				} else if(gFileObj.name.indexOf('.jpg') != -1) {
-			 					var metadata = { contentType: 'image/jpeg' };
-			 				} else {
-			 					var metadata = { contentType: 'video/mp4' };
-			 				}
-
-			 				gFileObj.setMetadata(metadata, function(err, apiResponse) {});
-			 				_uploaded_files_count++;
-
-			 				_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': _uploaded_files_count, 'totalCount': _total_files_count};
-			 				wss.broadcast(JSON.stringify(_ret));
-
-			 				postToBroadcastCXLibrary(_uploaded_files_count, _total_files_count, body.uuid);
-			 			});
-			 			
 			 		}, index * 10);
 			 		
 			 	});
