@@ -428,7 +428,7 @@ function hlsTranscode(req, res, next) {
 			 				destination: _GCS_BASEPATH + path.basename(file) // Directory of /filenamewithoutextension/file
 			 			};
 
-			 			gcs_upload(file, _options, __uploaded_files_count);
+			 			gcs_upload(file, _options, _uploaded_files_count);
 
 			 		}, index * 10);
 			 		
