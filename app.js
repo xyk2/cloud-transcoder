@@ -380,11 +380,13 @@ function hlsTranscode(req, res, next) {
 		if(_transcodedRenditionsCount != 5) return;
 		_transcodeInProgress = false; // End transcode in progress flag
 
-		function gcs_upload(file, options, count) {
-			dest_bucket.upload(file, _options, function(err, gFileObj) {
+		function gcs_upload(file, options) {
+			dest_bucket.upload(file, options, function(err, gFileObj) {
 				if(err) { 
 					//return console.log(err);
+					console.log("File upload failed for " + file + ", trying again.");
 					gcs_upload(file, options); // retry if error
+					return;
 				}
 
 				if(gFileObj.name.indexOf('.m3u8') != -1) {
@@ -398,12 +400,12 @@ function hlsTranscode(req, res, next) {
 				}
 
 				gFileObj.setMetadata(metadata, function(err, apiResponse) {});
-				count++;
+				_uploaded_files_count++;
 
-				_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': count, 'totalCount': _total_files_count};
+				_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': _uploaded_files_count, 'totalCount': _total_files_count};
 				wss.broadcast(JSON.stringify(_ret));
 
-				postToBroadcastCXLibrary(count, _total_files_count, body.uuid);
+				postToBroadcastCXLibrary(_uploaded_files_count, _total_files_count, body.uuid);
 			});
 		}
 
@@ -428,7 +430,7 @@ function hlsTranscode(req, res, next) {
 			 				destination: _GCS_BASEPATH + path.basename(file) // Directory of /filenamewithoutextension/file
 			 			};
 
-			 			gcs_upload(file, _options, _uploaded_files_count);
+			 			gcs_upload(file, _options);
 
 			 		}, index * 10);
 			 		
@@ -476,8 +478,9 @@ function debugUpload(req, res, next) {
 			dest_bucket.upload(file, options, function(err, gFileObj) {
 				if(err) { 
 					//return console.log(err);
-					console.log("Retry attempt");
+					console.log("File upload failed for " + file + ", trying again.");
 					gcs_upload(file, options); // retry if error
+					return;
 				}
 
 				if(gFileObj.name.indexOf('.m3u8') != -1) {
