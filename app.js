@@ -67,7 +67,7 @@ wss.on('connection', function connection(ws) {
 _transcodeInProgress = false;
 
 server.post('/transcode/hls/:filename', hlsTranscode);
-server.get('/heartbeat', function(req, res, next) {
+server.get('/', function(req, res, next) {
 	res.send({status: "RUNNING"});
 });
 
