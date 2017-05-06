@@ -67,7 +67,7 @@ wss.on('connection', function connection(ws) {
 _transcodeInProgress = false;
 
 server.post('/transcode/hls/:filename', hlsTranscode);
-//server.post('/transcode/hls/:filename', postLibraryTest);
+server.get('/debugUpload', debugUpload);
 
 
 function hlsTranscode(req, res, next) {
@@ -435,7 +435,6 @@ function hlsTranscode(req, res, next) {
 			 	});
 			 });
 
-
 		});
 	}
 
@@ -472,24 +471,60 @@ function hlsTranscode(req, res, next) {
 }
 
 
-function postLibraryTest(req, res, next) {
-	console.log(req.body.api);
+function debugUpload(req, res, next) {
+		function gcs_upload(file, options, count) {
+			dest_bucket.upload(file, _options, function(err, gFileObj) {
+				if(err) { 
+					//return console.log(err);
+					gcs_upload(file, options); // retry if error
+				}
 
-	var options = {
-		uri: _API_HOST + '/videos',
-		json: req.body.api
-	};
+				if(gFileObj.name.indexOf('.m3u8') != -1) {
+					var metadata = { contentType: 'application/x-mpegURL' };
+				} else if(gFileObj.name.indexOf('.ts') != -1) {
+					var metadata = { contentType: 'video/MP2T' };
+				} else if(gFileObj.name.indexOf('.jpg') != -1) {
+					var metadata = { contentType: 'image/jpeg' };
+				} else {
+					var metadata = { contentType: 'video/mp4' };
+				}
 
+				gFileObj.setMetadata(metadata, function(err, apiResponse) {});
+				count++;
 
+				_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': count, 'totalCount': _total_files_count};
+				wss.broadcast(JSON.stringify(_ret));
 
-	request.post(options, function(err, httpResponse, body) {
-		if (err) return console.error('upload failed:', err);
+				//postToBroadcastCXLibrary(count, _total_files_count, body.uuid);
+			});
+		}
 
-		console.log('Upload successful!  Server responded with:', body);
-		console.log(body.uuid);
-	});
+		_GCS_BASEPATH = 'SANDBOX_UPLOAD_DEBUGGING/';
 
+		 dir.files(_OUTPUT_PATH, function(err, files) {
+		 	if (err) throw err;
 
+		 	_total_files_count = files.length;
+		 	_uploaded_files_count = 0; // Use this rather than index because indexes are called asynchronously
+
+		 	files.forEach(function(file, index) {
+		 		if(path.extname(file) != '.m3u8' && path.extname(file) != '.ts' && path.extname(file) != '.jpg' && path.extname(file) != '.mp4') return;
+		 		// Only upload M3U8s and transport streams
+
+		 		setTimeout(function() { // Sequence file uploads every 10ms to avoid socket timeouts
+		 			var _options = { // GCS destination bucket folder and file paths
+		 				resumable: false, // Disable resumable uploads (default is true for files >5MB). Socket hangup issues fix
+		 				validation: false, // Disable crc32/md5 checksum validation 
+		 				destination: _GCS_BASEPATH + path.basename(file) // Directory of /filenamewithoutextension/file
+		 			};
+
+		 			gcs_upload(file, _options, _uploaded_files_count);
+
+		 		}, index * 10);
+		 		
+		 	});
+		 });
+		
 }
 
 
