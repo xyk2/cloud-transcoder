@@ -594,7 +594,7 @@ function highlights(req, res, next) {
 
 		for(var x in req.body.highlights) { // Update videoUrl key in API library
 			_PUT_BODY = {
-				videoUrl: req.body.highlights[x].videoUrl
+				videoUrl: req.body.highlights[x].videoUrl,
 				thumbnail: req.body.highlights[x].thumbnail
 			};
 
