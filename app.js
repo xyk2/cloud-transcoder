@@ -38,7 +38,7 @@ if(process.env.PWD == '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner') {
 	_WS_PORT = 8081;
 
 } else { // Running local on development
-	_OUTPUT_PATH = '/Users/XYK/Desktop/ffmpeg_outputs';
+	_OUTPUT_PATH = '/Users/XYK/Desktop/Dropbox/broadcast.cx-ffmpeg-runner/_outputs';
 	_PRESETS_PATH = '/Users/XYK/Desktop/Dropbox/broadcast.cx-ffmpeg-runner/presets';
 	_API_HOST = 'http://local.broadcast.cx:8088';
 	ffmpeg.setFfmpegPath('/Users/XYK/Desktop/ffmpeg'); // Explicitly set ffmpeg and ffprobe paths
@@ -67,6 +67,7 @@ wss.on('connection', function connection(ws) {
 _transcodeInProgress = false;
 
 server.post('/transcode/hls/:filename', hlsTranscode);
+server.post('/transcode/highlights/:filename', highlights);
 server.get('/', function(req, res, next) {
 	res.send({status: "RUNNING"});
 });
@@ -481,62 +482,99 @@ function hlsTranscode(req, res, next) {
 }
 
 
-function debugUpload(req, res, next) {
-		function gcs_upload(file, options) {
-			dest_bucket.upload(file, options, function(err, gFileObj) {
-				if(err) { 
-					//return console.log(err);
-					console.log("File upload failed for " + file + ", trying again.");
-					gcs_upload(file, options); // retry if error
-					return;
-				}
+function highlights(req, res, next) {
+	/*
+	if(req.body.startTime && req.body.endTime && req.body.endTime > req.body.startTime) {
+		// If there is a startTime parameter and an endTime parameter, modify _trimmingOptions -ss (start) and -t (duration)
+		_trimmingOptions = ['-ss ' + req.body.startTime, '-t ' + (req.body.endTime - req.body.startTime)];
+		console.log(_trimmingOptions);
+	}
+	*/
+	if(!req.params.filename || req.body.highlights.length == 0) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Invalid request.'}));
+		res.send(400, {status: 1, message: "Invalid Request."});
+		return;
+	}
+	if(_transcodeInProgress) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Already transcoding a file.'}));
+		res.send(400, {status: 1, message: "Already transcoding a file."});
+		return;
+	}
 
-				if(gFileObj.name.indexOf('.m3u8') != -1) {
-					var metadata = { contentType: 'application/x-mpegURL' };
-				} else if(gFileObj.name.indexOf('.ts') != -1) {
-					var metadata = { contentType: 'video/MP2T' };
-				} else if(gFileObj.name.indexOf('.jpg') != -1) {
-					var metadata = { contentType: 'image/jpeg' };
-				} else {
-					var metadata = { contentType: 'video/mp4' };
-				}
+	_transcodeInProgress = true;
+	_transcodedRenditionsCount = 0;
+	_totalTranscodedRenditionsCount = req.body.highlights.length;
 
-				gFileObj.setMetadata(metadata, function(err, apiResponse) {});
-				_uploaded_files_count++;
+	//_trimmingOptions = ['-ss 00:20:26', '-t 10'];
 
-				_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': _uploaded_files_count, 'totalCount': _total_files_count};
-				wss.broadcast(JSON.stringify(_ret));
+	CUT_HIGHLIGHT = function(filename, trimmingOptions, gcsFilename, callback) { 
+		_HD_720P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('highlight_mp4')
+		.inputOptions(trimmingOptions)
+		.on('start', function(commandLine) {
+		    wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'start', 'rendition': '720P_3000K', 'command': commandLine}));
+		})
+		.on('progress', function(progress) {
+			//progress['event'] = 'progress';
+			//progress['rendition'] = '720P_3000K';			
+			wss.broadcast(JSON.stringify(progress));
+		})
+		.on('stderr', function(stderrLine) {
+		    //console.log('Stderr output: ' + stderrLine);
+		})
+		.on('error', function(err, stdout, stderr) {
+			wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
+		})
+		.on('end', function(stdout, stderr) {
+		    _transcodedRenditionsCount++;
+		    wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'complete', 'rendition': '720P_3000K', 'completedCount': _transcodedRenditionsCount}));
+		    callback();
+		})
+		.saveToFile(_OUTPUT_PATH + '/' + gcsFilename);
+	}
 
-				//postToBroadcastCXLibrary(_uploaded_files_count, _total_files_count, body.uuid);
-			});
-		}
+	BEGIN_TRANSCODES = function() {
+		fs.emptyDir(_OUTPUT_PATH, err => { // Clear out output path of old files
+			if (err) return console.error(err);
 
-		_GCS_BASEPATH = 'SANDBOX_UPLOAD_DEBUGGING/';
+			for(var x in req.body.highlights) {
+				// Output filename format: startTime_lastBlockOfUUID_description.mp4
+				_gcsFilename = (req.body.highlights[x].startTime/1000).toFixed(0) + '_' + req.body.highlights[x].uuid.split('-')[4] + '_' + req.body.highlights[x].description + '.mp4';
+				_gcsFilename = _gcsFilename.replace(' ', '');
+				_trimmingOptions = ['-ss ' + (req.body.highlights[x].startTime/1000).toFixed(1), '-t ' + (req.body.highlights[x].endTime - req.body.highlights[x].startTime)/1000];
+				console.log(_gcsFilename);
+				console.log(_trimmingOptions);
+				//CUT_HIGHLIGHT(req.params.filename, )
+				CUT_HIGHLIGHT(req.params.filename, _trimmingOptions, _gcsFilename);
+				console.log();
+			}
+		});
+	}
 
-		 dir.files(_OUTPUT_PATH, function(err, files) {
-		 	if (err) throw err;
+	res.send({status: 0, message: "Starting highlights transcode", file: req.params.filename, count: _totalTranscodedRenditionsCount});
+	wss.broadcast(JSON.stringify({'event': 'gcsupload', 'uploadedCount': 0, 'totalCount': 0}));
+	wss.broadcast(JSON.stringify({'event': 'download', 'status': 'start', 'file': req.params.filename}));
 
-		 	_total_files_count = files.length;
-		 	_uploaded_files_count = 0; // Use this rather than index because indexes are called asynchronously
 
-		 	files.forEach(function(file, index) {
-		 		if(path.extname(file) != '.m3u8' && path.extname(file) != '.ts' && path.extname(file) != '.jpg' && path.extname(file) != '.mp4') return;
-		 		// Only upload M3U8s and transport streams
+	if(fs.existsSync(req.params.filename)) { // If file already downloaded in local directory, use that instead of downloading again
+		wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': req.params.filename}));
+		BEGIN_TRANSCODES();
+	} else {
+		bucket.file(req.params.filename).download({
+			destination: req.params.filename
+		}, function(err) {
+			if(err) { // Error handling (bucket file not found in GCS)
+				wss.broadcast(JSON.stringify({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message}));
+				res.send({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message});
+				return;
+			}
 
-		 		setTimeout(function() { // Sequence file uploads every 10ms to avoid socket timeouts
-		 			var _options = { // GCS destination bucket folder and file paths
-		 				resumable: false, // Disable resumable uploads (default is true for files >5MB). Socket hangup issues fix
-		 				validation: false, // Disable crc32/md5 checksum validation 
-		 				destination: _GCS_BASEPATH + path.basename(file) // Directory of /filenamewithoutextension/file
-		 			};
+			wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': req.params.filename}));
+			BEGIN_TRANSCODES();
+		});
+	}
 
-		 			gcs_upload(file, _options);
 
-		 		}, index * 10);
-		 		
-		 	});
-		 });
-		
+
 }
 
 
