@@ -452,10 +452,10 @@ function hlsTranscode(req, res, next) {
 		if(uploadedCount != totalCount) return;
 		console.log("postToBroadcastCXLibrary");
 
-		_POST_BODY = req.body.api;
-		_POST_BODY['masterPlaylistUrl'] = 'https://storage.googleapis.com/cx-video-content/' + _GCS_BASEPATH + 'index.m3u8';
+		_PUT_BODY = req.body.api;
+		_PUT_BODY['masterPlaylistUrl'] = 'https://storage.googleapis.com/cx-video-content/' + _GCS_BASEPATH + 'index.m3u8';
 
-		request.put({uri: _API_HOST + '/videos/' + uuid, json: _POST_BODY}, function(err, response, body) {
+		request.put({uri: _API_HOST + '/videos/' + uuid, json: _PUT_BODY}, function(err, response, body) {
 			if (err) return console.error(err);
 
 			console.log(body);
@@ -516,7 +516,8 @@ function highlights(req, res, next) {
 		.on('progress', function(progress) {
 			//progress['event'] = 'progress';
 			//progress['rendition'] = '720P_3000K';			
-			wss.broadcast(JSON.stringify(progress));
+			//wss.broadcast(JSON.stringify(progress));
+			console.log(JSON.stringify(progress));
 		})
 		.on('stderr', function(stderrLine) {
 		    //console.log('Stderr output: ' + stderrLine);
@@ -537,18 +538,89 @@ function highlights(req, res, next) {
 			if (err) return console.error(err);
 
 			for(var x in req.body.highlights) {
-				// Output filename format: startTime_lastBlockOfUUID_description.mp4
-				_gcsFilename = (req.body.highlights[x].startTime/1000).toFixed(0) + '_' + req.body.highlights[x].uuid.split('-')[4] + '_' + req.body.highlights[x].description + '.mp4';
-				_gcsFilename = _gcsFilename.replace(' ', '');
+				// Output filename format: startTime_lastBlockOfUUID_description.mp4 (spaces are replaced by underscores)
+				_gcsFilename = (req.body.highlights[x].startTime/1000).toFixed(0) + '_' + req.body.highlights[x].uuid.split('-')[4] + '_' + (req.body.highlights[x].description || "") + '.mp4';
+				_gcsFilename = _gcsFilename.replace(' ', '_');
 				_trimmingOptions = ['-ss ' + (req.body.highlights[x].startTime/1000).toFixed(1), '-t ' + (req.body.highlights[x].endTime - req.body.highlights[x].startTime)/1000];
-				console.log(_gcsFilename);
-				console.log(_trimmingOptions);
-				//CUT_HIGHLIGHT(req.params.filename, )
-				CUT_HIGHLIGHT(req.params.filename, _trimmingOptions, _gcsFilename);
-				console.log();
+				
+				req.body.highlights[x].videoUrl = 'https://storage.googleapis.com/cx-video-content/highlights/' + _gcsFilename;
+				CUT_HIGHLIGHT(req.params.filename, _trimmingOptions, _gcsFilename, UPLOAD_TO_GCS);
 			}
 		});
 	}
+
+	UPLOAD_TO_GCS = function() { // Executes as callback on each transcode end event, will upload after all highlights are done cutting
+		if(_transcodedRenditionsCount != _totalTranscodedRenditionsCount) return;
+		_transcodeInProgress = false; // End transcode in progress 
+
+		function gcs_upload(file, options, uuid) {
+			dest_bucket.upload(file, options, function(err, gFileObj) {
+				if(err) { 
+					//return console.log(err);
+					console.log("File upload failed for " + file + ", trying again.");
+					gcs_upload(file, options, uuid); // retry if error
+					return;
+				}
+
+				if(gFileObj.name.indexOf('.jpg') != -1) {
+					var metadata = { contentType: 'image/jpeg' };
+				} else {
+					var metadata = { contentType: 'video/mp4' };
+				}
+
+				gFileObj.setMetadata(metadata, function(err, apiResponse) {});
+				_uploaded_files_count++;
+
+				_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': _uploaded_files_count, 'totalCount': _total_files_count};
+				wss.broadcast(JSON.stringify(_ret));
+
+				//postToBroadcastCXLibrary(_uploaded_files_count, _total_files_count, uuid);
+			});
+		}
+
+
+		for(var x in req.body.highlights) {
+			_PUT_BODY = req.body.highlights[x];
+
+			request.put({uri: _API_HOST + '/manualLiveMarkedHighlights/' + req.body.highlights[x].uuid, json: _PUT_BODY}, function(err, response, body) {
+				if (err) return console.error(err);
+				console.log(body);
+			});
+		}
+
+		dir.files(_OUTPUT_PATH, function(err, files) {
+		 	if (err) throw err;
+
+		 	_total_files_count = files.length;
+		 	_uploaded_files_count = 0; // Use this rather than index because indexes are called asynchronously
+
+		 	files.forEach(function(file, index) {
+		 		if(path.extname(file) != '.jpg' && path.extname(file) != '.mp4') return;
+		 		// Only upload MP4s and JPG
+
+		 		setTimeout(function() { // Sequence file uploads every 10ms to avoid socket timeouts
+		 			var _options = { // GCS destination bucket folder and file paths
+		 				resumable: false, // Disable resumable uploads (default is true for files >5MB). Socket hangup issues fix
+		 				validation: false, // Disable crc32/md5 checksum validation 
+		 				destination: 'highlights/' + path.basename(file) // Directory of /filenamewithoutextension/file
+		 			};
+
+		 			gcs_upload(file, _options, '');
+		 		}, index * 10);
+		 		
+		 	});
+		 });
+
+	
+
+
+
+
+		console.log("Completed transcodes, starting upload");
+
+	}
+
+
 
 	res.send({status: 0, message: "Starting highlights transcode", file: req.params.filename, count: _totalTranscodedRenditionsCount});
 	wss.broadcast(JSON.stringify({'event': 'gcsupload', 'uploadedCount': 0, 'totalCount': 0}));
@@ -558,7 +630,8 @@ function highlights(req, res, next) {
 	if(fs.existsSync(req.params.filename)) { // If file already downloaded in local directory, use that instead of downloading again
 		wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': req.params.filename}));
 		BEGIN_TRANSCODES();
-	} else {
+
+	} else { // If doesn't exist then download from GCS
 		bucket.file(req.params.filename).download({
 			destination: req.params.filename
 		}, function(err) {
