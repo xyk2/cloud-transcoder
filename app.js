@@ -558,7 +558,7 @@ function highlights(req, res, next) {
 				_trimmingOptions = ['-ss ' + (req.body.highlights[x].startTime/1000).toFixed(1), '-t ' + (req.body.highlights[x].endTime - req.body.highlights[x].startTime)/1000];
 				
 				req.body.highlights[x].videoUrl = 'https://storage.googleapis.com/cx-video-content/highlights/' + _gcsFilename;
-				req.body.highlights[x].thumbnail = 'https://storage.googleapis.com/cx-video-content/highlights/' + _gcsThumbnailFilename;
+				req.body.highlights[x].thumbnailUrl = 'https://storage.googleapis.com/cx-video-content/highlights/' + _gcsThumbnailFilename;
 				CUT_HIGHLIGHT(req.params.filename, _trimmingOptions, _gcsFilename, _gcsThumbnailFilename, UPLOAD_TO_GCS);
 			}
 		});
@@ -595,7 +595,7 @@ function highlights(req, res, next) {
 		for(var x in req.body.highlights) { // Update videoUrl key in API library
 			_PUT_BODY = {
 				videoUrl: req.body.highlights[x].videoUrl,
-				thumbnail: req.body.highlights[x].thumbnail
+				thumbnailUrl: req.body.highlights[x].thumbnailUrl
 			};
 
 			request.put({uri: _API_HOST + '/manualLiveMarkedHighlights/' + req.body.highlights[x].uuid, json: _PUT_BODY}, function(err, response, body) {
