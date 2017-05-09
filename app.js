@@ -507,8 +507,9 @@ function highlights(req, res, next) {
 
 	//_trimmingOptions = ['-ss 00:20:26', '-t 10'];
 
-	CUT_HIGHLIGHT = function(filename, trimmingOptions, gcsFilename, callback) { 
+	CUT_HIGHLIGHT = function(filename, trimmingOptions, gcsFilename, gcsThumbnailFilename, callback) { 
 		_HD_720P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('highlight_mp4')
+		.videoBitrate(2000)
 		.inputOptions(trimmingOptions)
 		.on('start', function(commandLine) {
 		    wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'start', 'rendition': '720P_3000K', 'command': commandLine}));
@@ -526,9 +527,21 @@ function highlights(req, res, next) {
 			wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
 		})
 		.on('end', function(stdout, stderr) {
-		    _transcodedRenditionsCount++;
-		    wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'complete', 'rendition': '720P_3000K', 'completedCount': _transcodedRenditionsCount}));
-		    callback();
+			ffmpeg(_OUTPUT_PATH + '/' + gcsFilename)
+			.on('filenames', function(filenames) {
+		  	})
+			.on('end', function() {
+				_transcodedRenditionsCount++;
+				wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'complete', 'rendition': '720P_3000K', 'completedCount': _transcodedRenditionsCount}));
+				callback();
+			})
+			.screenshots({
+				// Will take screens at 20%, 40%, 60% and 80% of the video
+				count: 1,
+				folder: _OUTPUT_PATH,
+				filename: gcsThumbnailFilename,
+				size: '512x288'
+			});	
 		})
 		.saveToFile(_OUTPUT_PATH + '/' + gcsFilename);
 	}
@@ -541,10 +554,12 @@ function highlights(req, res, next) {
 				// Output filename format: startTime_lastBlockOfUUID_description.mp4 (spaces are replaced by underscores)
 				_gcsFilename = (req.body.highlights[x].startTime/1000).toFixed(0) + '_' + req.body.highlights[x].uuid.split('-')[4] + '_' + (req.body.highlights[x].description || "") + '.mp4';
 				_gcsFilename = _gcsFilename.replace(' ', '_');
+				_gcsThumbnailFilename = _gcsFilename.replace('.mp4', '.jpg');
 				_trimmingOptions = ['-ss ' + (req.body.highlights[x].startTime/1000).toFixed(1), '-t ' + (req.body.highlights[x].endTime - req.body.highlights[x].startTime)/1000];
 				
 				req.body.highlights[x].videoUrl = 'https://storage.googleapis.com/cx-video-content/highlights/' + _gcsFilename;
-				CUT_HIGHLIGHT(req.params.filename, _trimmingOptions, _gcsFilename, UPLOAD_TO_GCS);
+				req.body.highlights[x].thumbnail = 'https://storage.googleapis.com/cx-video-content/highlights/' + _gcsThumbnailFilename;
+				CUT_HIGHLIGHT(req.params.filename, _trimmingOptions, _gcsFilename, _gcsThumbnailFilename, UPLOAD_TO_GCS);
 			}
 		});
 	}
@@ -573,14 +588,14 @@ function highlights(req, res, next) {
 
 				_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': _uploaded_files_count, 'totalCount': _total_files_count};
 				wss.broadcast(JSON.stringify(_ret));
-
-				//postToBroadcastCXLibrary(_uploaded_files_count, _total_files_count, uuid);
 			});
 		}
 
 
-		for(var x in req.body.highlights) {
-			_PUT_BODY = req.body.highlights[x];
+		for(var x in req.body.highlights) { // Update videoUrl key in API library
+			_PUT_BODY = {
+				videoUrl: req.body.highlights[x].videoUrl
+			};
 
 			request.put({uri: _API_HOST + '/manualLiveMarkedHighlights/' + req.body.highlights[x].uuid, json: _PUT_BODY}, function(err, response, body) {
 				if (err) return console.error(err);

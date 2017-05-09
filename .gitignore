@@ -48,6 +48,7 @@ jspm_packages
 
 AWS_access_keys
 *.mp4
+_outputs/*
 
 # Elastic Beanstalk Files
 .elasticbeanstalk/*
