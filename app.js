@@ -633,7 +633,7 @@ function highlights(req, res, next) {
 	res.send({status: 0, message: "Starting highlights transcode", file: req.params.filename, count: _totalTranscodedRenditionsCount});
 	wss.broadcast(JSON.stringify({'event': 'gcsupload', 'uploadedCount': 0, 'totalCount': 0}));
 	wss.broadcast(JSON.stringify({'event': 'download', 'status': 'start', 'file': req.params.filename}));
-	wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'complete', 'completedCount': 0, 'totalCount': 0}));
+	wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'complete', 'completedCount': 0, 'totalCount': _totalTranscodedRenditionsCount}));
 
 
 	if(fs.existsSync(req.params.filename)) { // If file already downloaded in local directory, use that instead of downloading again
