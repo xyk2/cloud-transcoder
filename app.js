@@ -512,7 +512,7 @@ function highlights(req, res, next) {
 		.videoBitrate(2000)
 		.inputOptions(trimmingOptions)
 		.on('start', function(commandLine) {
-		    wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'start', 'rendition': '720P_3000K', 'command': commandLine}));
+		    wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'start', 'command': commandLine}));
 		})
 		.on('progress', function(progress) {
 			//progress['event'] = 'progress';
@@ -532,7 +532,7 @@ function highlights(req, res, next) {
 		  	})
 			.on('end', function() {
 				_transcodedRenditionsCount++;
-				wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'complete', 'rendition': '720P_3000K', 'completedCount': _transcodedRenditionsCount}));
+				wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'complete', 'completedCount': _transcodedRenditionsCount, 'totalCount': _totalTranscodedRenditionsCount}));
 				callback();
 			})
 			.screenshots({
@@ -592,7 +592,7 @@ function highlights(req, res, next) {
 		}
 
 
-		for(var x in req.body.highlights) { // Update videoUrl key in API library
+		for(var x in req.body.highlights) { // Update videoUrl and thumbnailUrl key in API library
 			_PUT_BODY = {
 				videoUrl: req.body.highlights[x].videoUrl,
 				thumbnailUrl: req.body.highlights[x].thumbnailUrl
@@ -626,14 +626,6 @@ function highlights(req, res, next) {
 		 		
 		 	});
 		 });
-
-	
-
-
-
-
-		console.log("Completed transcodes, starting upload");
-
 	}
 
 
@@ -641,6 +633,7 @@ function highlights(req, res, next) {
 	res.send({status: 0, message: "Starting highlights transcode", file: req.params.filename, count: _totalTranscodedRenditionsCount});
 	wss.broadcast(JSON.stringify({'event': 'gcsupload', 'uploadedCount': 0, 'totalCount': 0}));
 	wss.broadcast(JSON.stringify({'event': 'download', 'status': 'start', 'file': req.params.filename}));
+	wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'complete', 'completedCount': 0, 'totalCount': 0}));
 
 
 	if(fs.existsSync(req.params.filename)) { // If file already downloaded in local directory, use that instead of downloading again
