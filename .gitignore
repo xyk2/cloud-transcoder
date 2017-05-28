@@ -49,6 +49,7 @@ jspm_packages
 AWS_access_keys
 *.mp4
 _outputs/*
+!CX_brand_ending_stinger.mp4
 
 # Elastic Beanstalk Files
 .elasticbeanstalk/*

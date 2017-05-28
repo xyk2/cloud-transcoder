@@ -62,15 +62,14 @@ wss.on('connection', function connection(ws) {
 	ws.send(JSON.stringify({'event': 'success', 'message': 'Connected to ffmpeg-runner.'}));
 });
 
-
-
 _transcodeInProgress = false;
+
+
+
 
 server.post('/transcode/hls/:filename', hlsTranscode);
 server.post('/transcode/highlights/:filename', highlights);
-server.get('/', function(req, res, next) {
-	res.send({status: "RUNNING"});
-});
+server.post('/transcode/highlightReel/:filename', highlightReel);
 
 
 function hlsTranscode(req, res, next) {
@@ -590,6 +589,159 @@ function highlights(req, res, next) {
 				}
 			}
 		});
+	}
+
+
+
+	res.send({status: 0, message: "Starting highlights transcode", file: req.params.filename, count: _totalTranscodedRenditionsCount});
+	wss.broadcast(JSON.stringify({'event': 'gcsupload', 'uploadedCount': 0, 'totalCount': 0}));
+	wss.broadcast(JSON.stringify({'event': 'download', 'status': 'start', 'file': req.params.filename}));
+	wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'complete', 'completedCount': 0, 'totalCount': _totalTranscodedRenditionsCount}));
+
+
+	if(fs.existsSync(req.params.filename)) { // If file already downloaded in local directory, use that instead of downloading again
+		wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': req.params.filename}));
+		BEGIN_TRANSCODES();
+
+	} else { // If doesn't exist then download from GCS
+		bucket.file(req.params.filename).download({
+			destination: req.params.filename
+		}, function(err) {
+			if(err) { // Error handling (bucket file not found in GCS)
+				wss.broadcast(JSON.stringify({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message}));
+				res.send({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message});
+				return;
+			}
+
+			wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': req.params.filename}));
+			BEGIN_TRANSCODES();
+		});
+	}
+}
+
+
+
+
+
+
+function highlightReel(req, res, next) {
+	if(!req.params.filename || req.body.highlights.length == 0) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Invalid request.'}));
+		res.send(400, {status: 1, message: "Invalid Request."});
+		return;
+	}
+
+	_transcodedRenditionsCount = 0;
+	_uploadedFilesCount = 0;
+	_concatenate_playlist = ''; // txt file for ffmpeg concatenate command
+	_totalTranscodedRenditionsCount = req.body.highlights.length;
+
+	function gcs_upload(file, options, uuid) {
+		dest_bucket.upload(file, options, function(err, gFileObj) {
+			if(err) { 
+				console.log("File upload failed for " + file + ", trying again.");
+				gcs_upload(file, options, uuid); // retry if error
+				return;
+			}
+
+			if(gFileObj.name.indexOf('.jpg') != -1) {
+				var metadata = { contentType: 'image/jpeg' };
+			} else {
+				var metadata = { contentType: 'video/mp4' };
+			}
+
+			gFileObj.setMetadata(metadata, function(err, apiResponse) {});
+			_uploadedFilesCount++;
+
+			_ret = {'event': 'gcsupload', 'file': gFileObj.name, 'uploadedCount': _uploadedFilesCount, 'totalCount': _totalTranscodedRenditionsCount * 2};
+			wss.broadcast(JSON.stringify(_ret));
+		});
+	}
+
+	CUT_HIGHLIGHT = function(filename, trimmingOptions, gcsFilename, callback) {
+		_HD_720P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('highlight_mp4')
+		.videoBitrate(3000)
+		.inputOptions(trimmingOptions)
+		.on('start', function(commandLine) {
+		    wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'start', 'command': commandLine}));
+		})
+		.on('progress', function(progress) {
+			console.log(JSON.stringify(progress));
+		})
+		.on('stderr', function(stderrLine) {
+		    //console.log('Stderr output: ' + stderrLine);
+		})
+		.on('error', function(err, stdout, stderr) {
+			wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
+		})
+		.on('end', function(stdout, stderr) {
+			_transcodedRenditionsCount++;
+			wss.broadcast(JSON.stringify({'event': 'highlight', 'status': 'complete', 'completedCount': _transcodedRenditionsCount, 'totalCount': _totalTranscodedRenditionsCount}));
+			callback();
+		})
+		.saveToFile(_OUTPUT_PATH + '/' + gcsFilename);
+	}
+
+	CONCATENATE_HIGHLIGHTS = function() {
+		if(_transcodedRenditionsCount != _totalTranscodedRenditionsCount) return;
+		_output_filename = 'highlightReel_' + Math.floor(new Date() / 1000) + '_' + req.body.api.gameId + '.mp4';
+
+		fs.writeFileSync('_concatenate_playlist.txt', _concatenate_playlist, 'utf-8');
+
+		ffmpeg('_concatenate_playlist.txt')
+			.inputOptions('-f', 'concat')
+			.inputOptions('-safe', '0')
+			.outputOptions('-c', 'copy')
+			.on('start', function(commandLine) {
+			    wss.broadcast(JSON.stringify({'event': 'highlightReel', 'status': 'start', 'command': commandLine}));
+			})
+			.on('progress', function(progress) {
+				console.log(JSON.stringify(progress));
+			})
+			.on('stderr', function(stderrLine) {
+			    //onsole.log('Stderr output: ' + stderrLine);
+			})
+			.on('error', function(err, stdout, stderr) {
+				wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
+			})
+			.on('end', function(stdout, stderr) {
+				wss.broadcast(JSON.stringify({'event': 'highlightReel', 'status': 'complete', 'filename': _output_filename}));
+
+
+				_JSON_BODY = {
+
+				};
+
+				request.post({uri: 'http://127.0.0.1:' + _PORT + '/transcode/hls/' + _output_filename, json: req.body.api}, function(err, response, body) {
+					if (err) return console.error(err);
+					console.log(response);
+				});
+
+
+			})
+			.saveToFile(_output_filename);
+
+	}
+
+	BEGIN_TRANSCODES = function() {
+		fs.emptyDir(_OUTPUT_PATH, err => { // Clear out output path of old files
+			if (err) return console.error(err);
+
+			for(var x in req.body.highlights) {
+				// Output filename format: startTime_lastBlockOfUUID_description.mp4 (spaces are replaced by underscores)
+				_gcsFilename = (req.body.highlights[x].startTime/1000).toFixed(0) + '_' + req.body.highlights[x].uuid.split('-')[4] + '_' + (req.body.highlights[x].description || "") + '.mp4';
+				_gcsFilename = _gcsFilename.replace(' ', '_');
+
+				_trimLength = (req.body.highlights[x].endTime - req.body.highlights[x].startTime)/1000;
+				_trimmingOptions = ['-ss ' + (req.body.highlights[x].startTime/1000).toFixed(1), '-t ' + _trimLength];
+				_concatenate_playlist += "file '" + _OUTPUT_PATH + '/' + _gcsFilename + "'\n";
+
+				if(_trimLength > 1) { // Ensure no 0 lengths
+					CUT_HIGHLIGHT(req.params.filename, _trimmingOptions, _gcsFilename, CONCATENATE_HIGHLIGHTS);
+				}
+			}
+		});
+		
 	}
 
 
