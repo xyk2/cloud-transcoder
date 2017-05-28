@@ -684,8 +684,8 @@ function highlightReel(req, res, next) {
 
 	CONCATENATE_HIGHLIGHTS = function() {
 		if(_transcodedRenditionsCount != _totalTranscodedRenditionsCount) return;
-		_output_filename = 'highlightReel_' + Math.floor(new Date() / 1000) + '_' + req.body.api.gameId + '.mp4';
 
+		_output_filename = 'highlightReel_' + Math.floor(new Date() / 1000) + '_' + req.body.api.gameId + '.mp4';
 		fs.writeFileSync('_concatenate_playlist.txt', _concatenate_playlist, 'utf-8');
 
 		ffmpeg('_concatenate_playlist.txt')
@@ -707,14 +707,9 @@ function highlightReel(req, res, next) {
 			.on('end', function(stdout, stderr) {
 				wss.broadcast(JSON.stringify({'event': 'highlightReel', 'status': 'complete', 'filename': _output_filename}));
 
-
-				_JSON_BODY = {
-
-				};
-
-				request.post({uri: 'http://127.0.0.1:' + _PORT + '/transcode/hls/' + _output_filename, json: req.body.api}, function(err, response, body) {
+				request.post({uri: 'http://127.0.0.1:' + _PORT + '/transcode/hls/' + _output_filename, json: req.body}, function(err, response, body) {
 					if (err) return console.error(err);
-					console.log(response);
+					//console.log(response);
 				});
 
 
