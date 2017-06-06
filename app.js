@@ -452,7 +452,7 @@ function hlsTranscode(req, res, next) {
 		console.log("postToBroadcastCXLibrary");
 
 		_PUT_BODY = req.body.api;
-		_PUT_BODY['masterPlaylistUrl'] = 'https://storage.googleapis.com/cx-video-content/' + _GCS_BASEPATH + 'index.m3u8';
+		_PUT_BODY['masterPlaylistUrl'] = 'http://cdn-google.broadcast.cx/' + _GCS_BASEPATH + 'index.m3u8';
 
 		request.put({uri: _API_HOST + '/videos/' + uuid, json: _PUT_BODY}, function(err, response, body) {
 			if (err) return console.error(err);
@@ -460,7 +460,7 @@ function hlsTranscode(req, res, next) {
 			console.log(body);
 
 			for(var index in _thumbnailFiles) {
-				_thumbnailFiles[index]['thumbnailUrl'] = 'https://storage.googleapis.com/cx-video-content/' + _GCS_BASEPATH + _thumbnailFiles[index]['thumbnailUrl'];
+				_thumbnailFiles[index]['thumbnailUrl'] = 'http://cdn-google.broadcast.cx/' + _GCS_BASEPATH + _thumbnailFiles[index]['thumbnailUrl'];
 				request.post({uri: _API_HOST + '/thumbnails/' + uuid, json: _thumbnailFiles[index]}, function(err, response, body) {
 					if (err) return console.error(err);
 					console.log(body);
@@ -468,7 +468,7 @@ function hlsTranscode(req, res, next) {
 			}
 
 			for(var index in _MP4Files) {
-				_MP4Files[index]['videoUrl'] = 'https://storage.googleapis.com/cx-video-content/' + _GCS_BASEPATH + _MP4Files[index]['videoUrl'];
+				_MP4Files[index]['videoUrl'] = 'http://cdn-google.broadcast.cx/' + _GCS_BASEPATH + _MP4Files[index]['videoUrl'];
 				request.post({uri: _API_HOST + '/videoTranscodeProfiles/' + uuid, json: _MP4Files[index]}, function(err, response, body) {
 					if (err) return console.error(err);
 					console.log(body);
@@ -581,8 +581,8 @@ function highlights(req, res, next) {
 				_trimLength = (req.body.highlights[x].endTime - req.body.highlights[x].startTime)/1000;
 				_trimmingOptions = ['-ss ' + (req.body.highlights[x].startTime/1000).toFixed(1), '-t ' + _trimLength];
 				
-				req.body.highlights[x].videoUrl = 'https://storage.googleapis.com/cx-video-content/highlights/' + _gcsFilename;
-				req.body.highlights[x].thumbnailUrl = 'https://storage.googleapis.com/cx-video-content/highlights/' + _gcsThumbnailFilename;
+				req.body.highlights[x].videoUrl = 'http://cdn-google.broadcast.cx/highlights/' + _gcsFilename;
+				req.body.highlights[x].thumbnailUrl = 'http://cdn-google.broadcast.cx/highlights/' + _gcsThumbnailFilename;
 				
 				if(_trimLength > 1) {
 				// Ensure no 0 lengths
