@@ -6,7 +6,6 @@ var dir = require('node-dir');
 var path = require('path');
 var request = require('request');
 
-
 var google_cloud = require('google-cloud')({
 	projectId: 'broadcast-cx',
 	keyFilename: 'keys/broadcast-cx-bda0296621a4.json'
@@ -405,7 +404,8 @@ function hlsTranscode(req, res, next) {
 				} else {
 					var metadata = { contentType: 'video/mp4' };
 				}
-
+				metadata.cacheControl = 'public, max-age=31556926';
+				
 				gFileObj.setMetadata(metadata, function(err, apiResponse) {});
 				_uploadedFilesCount++;
 
@@ -505,7 +505,8 @@ function highlights(req, res, next) {
 			} else {
 				var metadata = { contentType: 'video/mp4' };
 			}
-
+			metadata.cacheControl = 'public, max-age=31556926';
+			
 			gFileObj.setMetadata(metadata, function(err, apiResponse) {});
 			_uploadedFilesCount++;
 
@@ -649,7 +650,8 @@ function highlightReel(req, res, next) {
 			} else {
 				var metadata = { contentType: 'video/mp4' };
 			}
-
+			metadata.cacheControl = 'public, max-age=31556926';
+			
 			gFileObj.setMetadata(metadata, function(err, apiResponse) {});
 			_uploadedFilesCount++;
 
