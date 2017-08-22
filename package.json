@@ -6,14 +6,16 @@
   "author": "Xiao Yang Kao",
   "license": "ISC",
   "dependencies": {
-    "fluent-ffmpeg": "^2.1.0",
-    "fs-extra": "^2.0.0",
-    "google-cloud": "^0.53.0",
-    "node-dir": "^0.1.16",
-    "pg": "^6.1.2",
+    "async": "^2.5.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "fs-extra": "^2.1.2",
+    "google-cloud": "^0.56.0",
+    "node-dir": "^0.1.17",
+    "pg": "^6.4.2",
     "request": "^2.80.0",
-    "restify": "^4.3.0",
-    "restify-plugins": "^1.5.1",
-    "ws": "^2.2.0"
+    "restify": "^4.3.1",
+    "restify-plugins": "^1.6.0",
+    "uuid": "^3.1.0",
+    "ws": "^2.3.1"
   }
 }

@@ -5,15 +5,28 @@ const WebSocket = require('ws');
 var dir = require('node-dir');
 var path = require('path');
 var request = require('request');
+var async = require('async');
+const uuidv4 = require('uuid/v4')
+
+var MIME_TYPE_LUT = {
+	'.m3u8': 'application/x-mpegURL',
+	'.ts': 'video/MP2T',
+	'.jpg': 'image/jpeg',
+	'.mp4': 'video/mp4',
+	'.m4a': 'audio/mp4'
+}
+var _transcodeInProgress = false;
 
 var google_cloud = require('google-cloud')({
 	projectId: 'broadcast-cx',
 	keyFilename: 'keys/broadcast-cx-bda0296621a4.json'
 });
 
+
 var gcs = google_cloud.storage();
 var bucket = gcs.bucket('broadcast-cx-raw-recordings');
 var dest_bucket = gcs.bucket('cx-video-content');
+//var dest_bucket = gcs.bucket('cx-videos');
 
 var server = restify.createServer({
 	name: 'ffmpeg-runner'
@@ -30,6 +43,7 @@ server.use(restify.fullResponse());
 
 // Semi-Hack: If environment path is same as GCS, then assume from GCS
 if(process.env.PWD == '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner') {
+	_INPUT_PATH = '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_inputs';
 	_OUTPUT_PATH = '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_outputs';
 	_PRESETS_PATH = '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/presets';
 	_API_HOST = 'http://api.broadcast.cx';
@@ -37,6 +51,7 @@ if(process.env.PWD == '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner') {
 	_WS_PORT = 8081;
 
 } else { // Running local on development
+	_INPUT_PATH = '/Users/XYK/Desktop/Dropbox/broadcast.cx-ffmpeg-runner/_inputs';
 	_OUTPUT_PATH = '/Users/XYK/Desktop/Dropbox/broadcast.cx-ffmpeg-runner/_outputs';
 	_PRESETS_PATH = '/Users/XYK/Desktop/Dropbox/broadcast.cx-ffmpeg-runner/presets';
 	_API_HOST = 'http://local.broadcast.cx:8088';
@@ -61,25 +76,26 @@ wss.on('connection', function connection(ws) {
 	ws.send(JSON.stringify({'event': 'success', 'message': 'Connected to ffmpeg-runner.'}));
 });
 
-_transcodeInProgress = false;
 
-
-
+server.use(function(req, res, next) { // If transcode already in progress, throw error
+	if(_transcodeInProgress) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Already transcoding a file.'}));
+		res.send(400, {status: 1, message: "Already transcoding a file."});
+		return;
+	}
+	next();
+})
 
 server.post('/transcode/hls/:filename', hlsTranscode);
 server.post('/transcode/highlights/:filename', highlights);
 server.post('/transcode/highlightReel/:filename', highlightReel);
+server.post('/transcode/fullgame/:filename', fullGameTranscodeToMP4HLS);
 
 
 function hlsTranscode(req, res, next) {
 	if(!req.params.filename) {
 		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Invalid request.'}));
 		res.send(400, {status: 1, message: "Invalid Request."});
-		return;
-	}
-	if(_transcodeInProgress) {
-		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Already transcoding a file.'}));
-		res.send(400, {status: 1, message: "Already transcoding a file."});
 		return;
 	}
 
@@ -480,7 +496,6 @@ function hlsTranscode(req, res, next) {
 	}
 }
 
-
 function highlights(req, res, next) {
 	if(!req.params.filename || req.body.highlights.length == 0) {
 		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Invalid request.'}));
@@ -619,11 +634,6 @@ function highlights(req, res, next) {
 		});
 	}
 }
-
-
-
-
-
 
 function highlightReel(req, res, next) {
 	if(!req.params.filename || req.body.highlights.length == 0) {
@@ -769,13 +779,420 @@ function highlightReel(req, res, next) {
 	}
 }
 
+function fullGameTranscodeToMP4HLS(req, res, next) {
+	if(!req.params.filename) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': 'Invalid request.'}));
+		res.send(400, {status: 1, message: "Invalid Request."});
+		return;
+	}
+
+	MASTER_GAME_FOOTAGE_HLS(req.params.filename);
+
+	res.send({status: 0, message: "Starting transcode", file: req.params.filename});
+}
+
+
+
+
+HD_720P_TRANSCODE = function(filename, prefix, callback) { 
+	_HD_720P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
+	.videoBitrate(3000)
+	.audioBitrate('128k')
+	.size('1280x720')
+	.on('start', function(commandLine) {
+	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '720P_3000K', 'command': commandLine}));
+
+	})
+	.on('progress', function(progress) {
+		progress['event'] = 'progress';
+		progress['rendition'] = '720P_3000K';			
+		wss.broadcast(JSON.stringify(progress));
+	})
+	.on('stderr', function(stderrLine) {
+	    //console.log('Stderr output: ' + stderrLine);
+	})
+	.on('error', function(err, stdout, stderr) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
+	})
+	.on('end', function(stdout, stderr) {
+	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'complete', 'rendition': '720P_3000K'}));
+
+	    ffmpeg(_OUTPUT_PATH + '/hls/720p_3000k.m3u8', { presets: _PRESETS_PATH }) // Concatenate M3U8 playlist into MP4 with moovatom at front
+	    .preset('m3u8_to_mp4')
+	   	.on('start', function(commandLine) {
+	   		wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'start', 'rendition': '720P_3000K', 'command': commandLine}));
+	   	})
+	   	.on('end', function(stdout, stderr) {
+   			wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'complete', 'rendition': '720P_3000K'}));
+   		
+   		    return callback(null, prefix + '_720p_3000k.mp4');
+	   	})
+	   	.saveToFile(_OUTPUT_PATH + '/' + prefix + '_720p_3000k.mp4')
+
+	})
+	.saveToFile(_OUTPUT_PATH + '/hls/720p_3000k.m3u8');
+}
+
+SD_480P_TRANSCODE = function(filename, prefix, callback) {
+	_SD_480P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
+	.videoBitrate(1500)
+	.audioBitrate('128k')
+	.size('854x480')
+	.on('start', function(commandLine) {
+	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '480P_1500K', 'command': commandLine}));
+	})
+	.on('progress', function(progress) {			
+		progress['event'] = 'progress';
+		progress['rendition'] = '480P_1500K';			
+		wss.broadcast(JSON.stringify(progress));
+	})
+	.on('stderr', function(stderrLine) {
+	    //console.log('Stderr output: ' + stderrLine);
+	})
+	.on('error', function(err, stdout, stderr) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
+	})
+	.on('end', function(stdout, stderr) {
+	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'complete', 'rendition': '480P_1500K'}));
+
+	    ffmpeg(_OUTPUT_PATH + '/hls/480p_1500k.m3u8', { presets: _PRESETS_PATH }) // Concatenate M3U8 playlist into MP4 with moovatom at front
+	    .preset('m3u8_to_mp4')
+	   	.on('start', function(commandLine) {
+	   		wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'start', 'rendition': '480P_1500K', 'command': commandLine}));
+	   	})
+	   	.on('end', function(stdout, stderr) {
+   			wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'complete', 'rendition': '480P_1500K'}));
+   		   
+   		    return callback(null, prefix + '_480p_1500k.mp4');
+	   	})
+	   	.saveToFile(_OUTPUT_PATH + '/' + prefix + '_480p_1500k.mp4')
+
+	})
+	.saveToFile(_OUTPUT_PATH + '/hls/480p_1500k.m3u8');
+}
+
+SD_360P_TRANSCODE = function(filename, prefix, callback) {
+	_SD_360P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
+	.videoBitrate(850)
+	.audioBitrate('128k')
+	.size('640x360')
+	.on('start', function(commandLine) {
+	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '360P_850K', 'command': commandLine}));
+	})
+	.on('progress', function(progress) {			
+		progress['event'] = 'progress';
+		progress['rendition'] = '360P_850K';			
+		wss.broadcast(JSON.stringify(progress));
+	})
+	.on('stderr', function(stderrLine) {
+	    //console.log('Stderr output: ' + stderrLine);
+	})
+	.on('error', function(err, stdout, stderr) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
+	})
+	.on('end', function(stdout, stderr) {
+	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'complete', 'rendition': '360P_850K'}));
+
+	    ffmpeg(_OUTPUT_PATH + '/hls/360p_850k.m3u8', { presets: _PRESETS_PATH }) // Concatenate M3U8 playlist into MP4 with moovatom at front
+	    .preset('m3u8_to_mp4')
+	   	.on('start', function(commandLine) {
+	   		wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'start', 'rendition': '360P_850K', 'command': commandLine}));
+	   	})
+	   	.on('end', function(stdout, stderr) {
+   			wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'complete', 'rendition': '360P_850K'}));
+   		    
+   		    return callback(null, prefix + '_360p_850k.mp4');
+	   	})
+	   	.saveToFile(_OUTPUT_PATH + '/' + prefix + '_360p_850k.mp4')
+
+	})
+	.saveToFile(_OUTPUT_PATH + '/hls/360p_850k.m3u8');
+}
+
+SD_240P_TRANSCODE = function(filename, prefix, callback) {
+	_SD_240P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
+	.videoBitrate(400)
+	.audioBitrate('128k')
+	.size('352x240')
+	.on('start', function(commandLine) {
+	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '240P_400K', 'command': commandLine}));
+	})
+	.on('progress', function(progress) {			
+		progress['event'] = 'progress';
+		progress['rendition'] = '240P_400K';			
+		wss.broadcast(JSON.stringify(progress));
+	})
+	.on('stderr', function(stderrLine) {
+	    //console.log('Stderr output: ' + stderrLine);
+	})
+	.on('error', function(err, stdout, stderr) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
+	})
+	.on('end', function(stdout, stderr) {
+	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'complete', 'rendition': '240P_400K'}));
+
+	    ffmpeg(_OUTPUT_PATH + '/hls/240p_400k.m3u8', { presets: _PRESETS_PATH }) // Concatenate M3U8 playlist into MP4 with moovatom at front
+	    .preset('m3u8_to_mp4')
+	   	.on('start', function(commandLine) {
+	   		wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'start', 'rendition': '240P_400K', 'command': commandLine}));
+	   	})
+	   	.on('error', function(err, stdout, stderr) {
+	   		console.log(err.message);
+	   	})
+	   	.on('end', function(stdout, stderr) {
+   			wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'complete', 'rendition': '240P_400K'}));
+   		
+   		    return callback(null, prefix + '_240p_400k.mp4');
+	   	})
+	   	.saveToFile(_OUTPUT_PATH + '/' + prefix + '_240p_400k.mp4')
+	})
+	.saveToFile(_OUTPUT_PATH + '/hls/240p_400k.m3u8');
+}
+
+AAC_128KBPS_HLS = function(filename, callback) {
+	_AAC_128KBPS = ffmpeg(filename, { presets: _PRESETS_PATH })
+	.noVideo()
+	.audioBitrate('128k')
+	.outputOptions('-c:a', 'aac')
+	.outputOptions('-hls_time', '6')
+	.outputOptions('-hls_list_size', '0')
+	.outputOptions('-f', 'hls')
+	.on('start', function(commandLine) {
+	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': 'AAC_128KBPS', 'command': commandLine}));
+	})
+	.on('progress', function(progress) {			
+		progress['event'] = 'progress';
+		progress['rendition'] = 'AAC_128KBPS';			
+		wss.broadcast(JSON.stringify(progress));
+	})
+	.on('stderr', function(stderrLine) {
+	    //console.log('Stderr output: ' + stderrLine);
+	})
+	.on('error', function(err, stdout, stderr) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
+	})
+	.on('end', function(stdout, stderr) {
+		wss.broadcast(JSON.stringify({'event': 'M3U8', 'status': 'complete', 'rendition': 'AAC_128KBPS'}));
+   		return callback(null, '/hls/128kbps_aac.m3u8');
+	})
+	.saveToFile(_OUTPUT_PATH + '/hls/128kbps_aac.m3u8');
+}
+
+AAC_128KBPS_M4A = function(filename, prefix, callback) {
+	_AAC_128KBPS = ffmpeg(filename, { presets: _PRESETS_PATH })
+	.noVideo()
+	.audioBitrate('128k')
+	.outputOptions('-c:a', 'aac')
+	.on('start', function(commandLine) {
+	    wss.broadcast(JSON.stringify({'event': 'aac', 'status': 'start', 'rendition': 'AAC_128KBPS', 'command': commandLine}));
+	})
+	.on('progress', function(progress) {			
+		progress['event'] = 'progress';
+		progress['rendition'] = 'AAC_128KBPS';			
+		wss.broadcast(JSON.stringify(progress));
+	})
+	.on('stderr', function(stderrLine) {
+	    //console.log('Stderr output: ' + stderrLine);
+	})
+	.on('error', function(err, stdout, stderr) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
+	})
+	.on('end', function(stdout, stderr) {
+		wss.broadcast(JSON.stringify({'event': 'aac', 'status': 'complete', 'rendition': 'AAC_128KBPS'}));
+   		return callback(null, prefix + '_128kbps_aac.m4a');
+	})
+	.saveToFile(_OUTPUT_PATH + '/' + prefix + '_128kbps_aac.m4a');
+}
+
+CREATE_THUMBNAILS = function(filename, callback) {
+	_thumbnailFiles = [];
+
+	ffmpeg(filename)
+	  	.on('filenames', function(filenames) {
+			wss.broadcast(JSON.stringify({'event': 'thumbnail', 'status': 'start', 'files': filenames}));
+			_thumbnailFiles = filenames;
+	  	})
+		.on('end', function() {
+			wss.broadcast(JSON.stringify({'event': 'thumbnail', 'status': 'complete'}));
+			return callback(null, _thumbnailFiles);
+		})
+		.screenshots({
+			count: 5, // Will take screens at 20%, 40%, 60% and 80% of the video
+			folder: _OUTPUT_PATH + '/thumbs',
+			filename: 'thumbnail_%s_%00i_%r.jpg',
+			size: '640x360'
+		});
+}
+
+CREATE_INDEX_M3U8 = function(callback) {
+	fs.createReadStream('index.m3u8').pipe(fs.createWriteStream(_OUTPUT_PATH + '/hls/index.m3u8'));
+	return callback(null, "/hls/index.m3u8");
+}
+
+// Recursively retry upload to GCS if fails
+GCS_UPLOAD_RECURSIVE = function(file, options, callback) {
+	dest_bucket.upload(file, options, function(err, gFileObj) {
+		if(err) {
+			console.log("File upload failed for " + file + ", trying again.");
+			GCS_UPLOAD_RECURSIVE(file, options, callback); // retry if error
+			return;
+		}
+
+		_ret = {'event': 'gcsupload', 'file': gFileObj.name};
+		wss.broadcast(JSON.stringify(_ret));
+		return callback();
+	});
+}
+
+TRANSCODE_FILE_TO_HLS_AND_UPLOAD = function(filename, prefix, destination, _callback) {
+	async.waterfall([
+		function(callback) { // Clear output directories
+			fs.emptyDir(_OUTPUT_PATH, err => { // Clear out output path of old m3u8 files
+				if (err) return console.error(err);
+				fs.mkdirSync(path.join(_OUTPUT_PATH, 'hls'));
+				fs.mkdirSync(path.join(_OUTPUT_PATH, 'thumbs'));
+				callback();
+			});
+		},
+		function(callback) { // Run transcodes in parallel
+			async.parallel([
+				function(callback) { CREATE_THUMBNAILS(filename, callback); },
+				function(callback) { HD_720P_TRANSCODE(filename, prefix, callback); },
+				function(callback) { SD_480P_TRANSCODE(filename, prefix, callback); },
+				function(callback) { SD_360P_TRANSCODE(filename, prefix, callback); },
+				function(callback) { SD_240P_TRANSCODE(filename, prefix, callback); },
+				function(callback) { AAC_128KBPS_M4A(filename, prefix, callback); },
+				function(callback) { CREATE_INDEX_M3U8(callback); },
+				function(callback) { AAC_128KBPS_HLS(filename, callback); }
+			],
+			function(err, results) {
+				console.log(results);
+				callback(null, results);
+			});
+		},
+		function(filenames, callback) { // Upload to GCS
+			 dir.files(_OUTPUT_PATH, function(err, files) {
+			 	if (err) throw err;
+			 	console.log('Files to upload: ' + files.length);
+
+			 	async.eachOfLimit(files, 100, function(absolute_fn, key, callback) {
+			 		if(!MIME_TYPE_LUT[path.extname(absolute_fn)]) return; // Only upload allowed extensions
+
+			 		var _options = { // GCS options 
+			 			resumable: false, // default is true for files >5MB
+			 			validation: false, // Disable crc32/md5 checksum validation 
+			 			destination: path.join(destination, path.relative(_OUTPUT_PATH, absolute_fn)),
+			 			metadata: {
+			 				contentType: MIME_TYPE_LUT[path.extname(absolute_fn)],
+			 				cacheControl: 'public, max-age=31556926'
+			 			}
+			 		};
+
+			 		GCS_UPLOAD_RECURSIVE(absolute_fn, _options, callback);
+			 	},
+			 	function(err) {
+			 		console.log('Completed upload ' + files.length);
+			 		_callback(null, filenames);
+			 	});
+			 });
+		}
+	]);
+}
+
+MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '240P_400K'}));
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '360P_850K'}));
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '480P_1500K'}));
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '720P_3000K'}));
+	wss.broadcast(JSON.stringify({'event': 'download', 'status': 'start', 'file': filename}));
+	_transcodeInProgress = true;
+
+	uuid = uuidv4();
+	_GCS_BASEPATH = path.join('game_footage', uuid);
+
+	async.waterfall([
+		function(callback) { // Download file
+			if(fs.existsSync(path.join(_INPUT_PATH, filename))) { // If file already downloaded in local directory, use that instead of downloading again
+				wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': filename}));
+				return callback();
+			} else {
+				bucket.file(filename).download({ destination: path.join(_INPUT_PATH, filename) }, function(err) {
+					if(err) { // Error handling (bucket file not found in GCS)
+						wss.broadcast(JSON.stringify({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message}));
+						return;
+					}
+					wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': filename}));
+					return callback();
+				});
+			}
+		},
+		function(callback) {
+			TRANSCODE_FILE_TO_HLS_AND_UPLOAD(path.join(_INPUT_PATH, filename), uuid, _GCS_BASEPATH, callback);
+		}
+	], function(err, results) {
+		async.parallel([
+			function(callback) { // Update queue status to FINISHED
+				console.log('PUTTING TO assets_transcode_queue');
+				request.put(_API_HOST + '/v2/transcode/jobs/' + job.id + '/finished', function(error, response, body) { callback(); });
+			},
+			function(callback) { // Update assets_game_footage table with urls
+				console.log("PUTTING TO assets_game_footage");
+				_PUT_BODY = {
+					hls_playlist_url: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results[6]),
+					mp4_240p: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results[4]),
+					mp4_360p: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results[3]),
+					mp4_480p: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results[2]),
+					mp4_720p: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results[1]),
+					thumbnails: JSON.stringify(results[0].map(function(e) {return 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, e)}))
+				};
+
+				request.put({
+					url: _API_HOST + '/v2/assets/game_footage/' + job.asset_game_footage_id,
+					method: 'PUT',
+					json: _PUT_BODY
+				}, function(error, response, body) {
+					callback();
+				});
+			}
+		], function(err, response) {
+			_transcodeInProgress = false;
+		});
+	});
+
+}
 
 
 
 
 
+setInterval(function() {
+	if(_transcodeInProgress) return;
 
+	async.waterfall([
+		function(callback) { // Get list of queued transcodes from the DB
+			request(_API_HOST + '/v2/transcode/jobs', function(error, response, body) {
+				if(error) return callback('Error connecting to queue.');
+				if(JSON.parse(body).length == 0) return callback('No jobs in the queue.');
 
+				callback(null, JSON.parse(body)[0]);
+			});
+		},
+		function(job, callback) { // Immediately follow by setting job status to IN_PROGRESS
+			request.put(_API_HOST + '/v2/transcode/jobs/' + job.id + '/start', function(error, response, body) {
+				_transcodeInProgress = true;
+				callback(null, job);
+			});
+		},
+		function(job, callback) {
+			MASTER_GAME_FOOTAGE_HLS(job.filename, job, callback);
+			console.log(job);
+		}
+	], function(err, response) {
+		if(err) return console.log(err);
+		console.log('response');
+	});
+
+}, 2000);
 
 
 server.listen(_PORT, function() {

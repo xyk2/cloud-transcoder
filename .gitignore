@@ -55,3 +55,5 @@ _outputs/*
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
+
+_inputs/*
