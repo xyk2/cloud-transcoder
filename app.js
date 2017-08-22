@@ -15,7 +15,7 @@ var MIME_TYPE_LUT = {
 	'.mp4': 'video/mp4',
 	'.m4a': 'audio/mp4'
 }
-var _transcodeInProgress = false;
+var _transcodeInProgress = 0;
 
 var google_cloud = require('google-cloud')({
 	projectId: 'broadcast-cx',
@@ -1105,7 +1105,7 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '480P_1500K'}));
 	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '720P_3000K'}));
 	wss.broadcast(JSON.stringify({'event': 'download', 'status': 'start', 'file': filename}));
-	_transcodeInProgress = true;
+	_transcodeInProgress += 1;
 
 	uuid = uuidv4();
 	_GCS_BASEPATH = path.join('game_footage', uuid);
@@ -1155,7 +1155,7 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 				});
 			}
 		], function(err, response) {
-			_transcodeInProgress = false;
+			_transcodeInProgress -= 1;
 		});
 	});
 
@@ -1166,7 +1166,7 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 
 
 setInterval(function() {
-	if(_transcodeInProgress) return;
+	if(_transcodeInProgress >= 2) return;
 
 	async.waterfall([
 		function(callback) { // Get list of queued transcodes from the DB
@@ -1179,7 +1179,7 @@ setInterval(function() {
 		},
 		function(job, callback) { // Immediately follow by setting job status to IN_PROGRESS
 			request.put(_API_HOST + '/v2/transcode/jobs/' + job.id + '/start', function(error, response, body) {
-				_transcodeInProgress = true;
+				//_transcodeInProgress += 1;
 				callback(null, job);
 			});
 		},
