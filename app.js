@@ -1172,7 +1172,7 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 
 
 
-setInterval(function() {
+setInterval(function() { // Poll DB for new jobs if there is no transcode in progress
 	if(_transcodeInProgress) return;
 
 	async.waterfall([
@@ -1198,7 +1198,6 @@ setInterval(function() {
 		if(err) return console.log(err);
 		console.log('response');
 	});
-
 }, 2000);
 
 
