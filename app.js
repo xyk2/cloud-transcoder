@@ -1119,7 +1119,7 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 				bucket.file(filename).download({ destination: path.join(_INPUT_PATH, filename) }, function(err) {
 					if(err) { // Error handling (bucket file not found in GCS)
 						wss.broadcast(JSON.stringify({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message}));
-						return;
+						return callback(err.code);
 					}
 					wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': filename}));
 					return callback();
@@ -1155,6 +1155,7 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 				});
 			}
 		], function(err, response) {
+			if(err) return request.put(_API_HOST + '/v2/transcode/jobs/' + job.id + '/error', function(error, response, body) { _transcodeInProgress = false; });
 			_transcodeInProgress = false;
 		});
 	});
