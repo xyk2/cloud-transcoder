@@ -1130,9 +1130,16 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 			TRANSCODE_FILE_TO_HLS_AND_UPLOAD(path.join(_INPUT_PATH, filename), uuid, _GCS_BASEPATH, callback);
 		}
 	], function(err, results) {
+		if(err) {
+			return request.put(_API_HOST + '/v2/transcode/jobs/' + job.id + '/error', function(error, response, body) {
+				_transcodeInProgress = false;
+				console.log('PUTTING TO assets_transcode_queue: ERROR')
+			});
+		}
+
 		async.parallel([
 			function(callback) { // Update queue status to FINISHED
-				console.log('PUTTING TO assets_transcode_queue');
+				console.log('PUTTING TO assets_transcode_queue: FINISHED');
 				request.put(_API_HOST + '/v2/transcode/jobs/' + job.id + '/finished', function(error, response, body) { callback(); });
 			},
 			function(callback) { // Update assets_game_footage table with urls
@@ -1155,7 +1162,6 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 				});
 			}
 		], function(err, response) {
-			if(err) return request.put(_API_HOST + '/v2/transcode/jobs/' + job.id + '/error', function(error, response, body) { _transcodeInProgress = false; });
 			_transcodeInProgress = false;
 		});
 	});
