@@ -122,7 +122,7 @@ function hlsTranscode(req, res, next) {
 		return;
 	}
 
-	HD_720P_TRANSCODE = function(filename, callback) { 
+	HD_720P_TRANSCODE = function(filename, callback) {
 		_HD_720P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 		.videoBitrate(3000)
 		//.audioBitrate('96k')
@@ -134,7 +134,7 @@ function hlsTranscode(req, res, next) {
 		})
 		.on('progress', function(progress) {
 			progress['event'] = 'progress';
-			progress['rendition'] = '720P_3000K';			
+			progress['rendition'] = '720P_3000K';
 			wss.broadcast(JSON.stringify(progress));
 		})
 		.on('stderr', function(stderrLine) {
@@ -182,9 +182,9 @@ function hlsTranscode(req, res, next) {
 		.on('start', function(commandLine) {
 		    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '480P_1500K', 'command': commandLine}));
 		})
-		.on('progress', function(progress) {			
+		.on('progress', function(progress) {
 			progress['event'] = 'progress';
-			progress['rendition'] = '480P_1500K';			
+			progress['rendition'] = '480P_1500K';
 			wss.broadcast(JSON.stringify(progress));
 		})
 		.on('stderr', function(stderrLine) {
@@ -205,7 +205,7 @@ function hlsTranscode(req, res, next) {
 		   	})
 		   	.on('end', function(stdout, stderr) {
 	   			wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'complete', 'rendition': '480P_1500K'}));
-	   		    
+
 	   		    _MP4Files.push({
 	   		    	targetBitrate: 1500,
 	   		    	targetDisplayWidth: 854,
@@ -232,9 +232,9 @@ function hlsTranscode(req, res, next) {
 		.on('start', function(commandLine) {
 		    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '360P_850K', 'command': commandLine}));
 		})
-		.on('progress', function(progress) {			
+		.on('progress', function(progress) {
 			progress['event'] = 'progress';
-			progress['rendition'] = '360P_850K';			
+			progress['rendition'] = '360P_850K';
 			wss.broadcast(JSON.stringify(progress));
 		})
 		.on('stderr', function(stderrLine) {
@@ -255,7 +255,7 @@ function hlsTranscode(req, res, next) {
     	   	})
     	   	.on('end', function(stdout, stderr) {
        			wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'complete', 'rendition': '360P_850K'}));
-       		    
+
        		    _MP4Files.push({
        		    	targetBitrate: 850,
        		    	targetDisplayWidth: 640,
@@ -282,9 +282,9 @@ function hlsTranscode(req, res, next) {
 		.on('start', function(commandLine) {
 		    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '240P_400K', 'command': commandLine}));
 		})
-		.on('progress', function(progress) {			
+		.on('progress', function(progress) {
 			progress['event'] = 'progress';
-			progress['rendition'] = '240P_400K';			
+			progress['rendition'] = '240P_400K';
 			wss.broadcast(JSON.stringify(progress));
 		})
 		.on('stderr', function(stderrLine) {
@@ -404,7 +404,7 @@ function hlsTranscode(req, res, next) {
 
 		function gcs_upload(file, options, uuid) {
 			dest_bucket.upload(file, options, function(err, gFileObj) {
-				if(err) { 
+				if(err) {
 					//return console.log(err);
 					console.log("File upload failed for " + file + ", trying again.");
 					gcs_upload(file, options, uuid); // retry if error
@@ -421,7 +421,7 @@ function hlsTranscode(req, res, next) {
 					var metadata = { contentType: 'video/mp4' };
 				}
 				metadata.cacheControl = 'public, max-age=31556926';
-				
+
 				gFileObj.setMetadata(metadata, function(err, apiResponse) {});
 				_uploadedFilesCount++;
 
@@ -449,14 +449,14 @@ function hlsTranscode(req, res, next) {
 			 		setTimeout(function() { // Sequence file uploads every 10ms to avoid socket timeouts
 			 			var _options = { // GCS destination bucket folder and file paths
 			 				resumable: false, // Disable resumable uploads (default is true for files >5MB). Socket hangup issues fix
-			 				validation: false, // Disable crc32/md5 checksum validation 
+			 				validation: false, // Disable crc32/md5 checksum validation
 			 				destination: _GCS_BASEPATH + path.basename(file) // Directory of /filenamewithoutextension/file
 			 			};
 
 			 			gcs_upload(file, _options, body.uuid);
 
 			 		}, index * 10);
-			 		
+
 			 	});
 			 });
 
@@ -509,7 +509,7 @@ function highlights(req, res, next) {
 
 	function gcs_upload(file, options, uuid) {
 		dest_bucket.upload(file, options, function(err, gFileObj) {
-			if(err) { 
+			if(err) {
 				console.log("File upload failed for " + file + ", trying again.");
 				gcs_upload(file, options, uuid); // retry if error
 				return;
@@ -521,7 +521,7 @@ function highlights(req, res, next) {
 				var metadata = { contentType: 'video/mp4' };
 			}
 			metadata.cacheControl = 'public, max-age=31556926';
-			
+
 			gFileObj.setMetadata(metadata, function(err, apiResponse) {});
 			_uploadedFilesCount++;
 
@@ -530,7 +530,7 @@ function highlights(req, res, next) {
 		});
 	}
 
-	CUT_HIGHLIGHT = function(filename, trimmingOptions, gcsFilename, gcsThumbnailFilename, highlightParameters, callback) { 
+	CUT_HIGHLIGHT = function(filename, trimmingOptions, gcsFilename, gcsThumbnailFilename, highlightParameters, callback) {
 		_HD_720P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('highlight_mp4')
 		.videoBitrate(2000)
 		.inputOptions(trimmingOptions)
@@ -539,7 +539,7 @@ function highlights(req, res, next) {
 		})
 		.on('progress', function(progress) {
 			//progress['event'] = 'progress';
-			//progress['rendition'] = '720P_3000K';			
+			//progress['rendition'] = '720P_3000K';
 			//wss.broadcast(JSON.stringify(progress));
 			console.log(JSON.stringify(progress));
 		})
@@ -555,7 +555,7 @@ function highlights(req, res, next) {
 		  	})
 			.on('end', function() {
 				_transcodedRenditionsCount++;
-				
+
 				_PUT_BODY = {
 					videoUrl: highlightParameters.videoUrl,
 					thumbnailUrl: highlightParameters.thumbnailUrl
@@ -578,7 +578,7 @@ function highlights(req, res, next) {
 				folder: _OUTPUT_PATH,
 				filename: gcsThumbnailFilename,
 				size: '512x288'
-			});	
+			});
 		})
 		.saveToFile(_OUTPUT_PATH + '/' + gcsFilename);
 	}
@@ -595,10 +595,10 @@ function highlights(req, res, next) {
 
 				_trimLength = (req.body.highlights[x].endTime - req.body.highlights[x].startTime)/1000;
 				_trimmingOptions = ['-ss ' + (req.body.highlights[x].startTime/1000).toFixed(1), '-t ' + _trimLength];
-				
+
 				req.body.highlights[x].videoUrl = 'http://cdn-google.broadcast.cx/highlights/' + _gcsFilename;
 				req.body.highlights[x].thumbnailUrl = 'http://cdn-google.broadcast.cx/highlights/' + _gcsThumbnailFilename;
-				
+
 				if(_trimLength > 1) {
 				// Ensure no 0 lengths
 					CUT_HIGHLIGHT(req.params.filename, _trimmingOptions, _gcsFilename, _gcsThumbnailFilename, req.body.highlights[x]);
@@ -649,7 +649,7 @@ function highlightReel(req, res, next) {
 
 	function gcs_upload(file, options, uuid) {
 		dest_bucket.upload(file, options, function(err, gFileObj) {
-			if(err) { 
+			if(err) {
 				console.log("File upload failed for " + file + ", trying again.");
 				gcs_upload(file, options, uuid); // retry if error
 				return;
@@ -661,7 +661,7 @@ function highlightReel(req, res, next) {
 				var metadata = { contentType: 'video/mp4' };
 			}
 			metadata.cacheControl = 'public, max-age=31556926';
-			
+
 			gFileObj.setMetadata(metadata, function(err, apiResponse) {});
 			_uploadedFilesCount++;
 
@@ -748,7 +748,7 @@ function highlightReel(req, res, next) {
 				}
 			}
 		});
-		
+
 	}
 
 
@@ -794,7 +794,7 @@ function fullGameTranscodeToMP4HLS(req, res, next) {
 
 
 
-HD_720P_TRANSCODE = function(filename, prefix, callback) { 
+HD_720P_TRANSCODE = function(filename, prefix, callback) {
 	_HD_720P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 	.videoBitrate(3000)
 	.audioBitrate('128k')
@@ -805,7 +805,7 @@ HD_720P_TRANSCODE = function(filename, prefix, callback) {
 	})
 	.on('progress', function(progress) {
 		progress['event'] = 'progress';
-		progress['rendition'] = '720P_3000K';			
+		progress['rendition'] = '720P_3000K';
 		wss.broadcast(JSON.stringify(progress));
 	})
 	.on('stderr', function(stderrLine) {
@@ -824,7 +824,7 @@ HD_720P_TRANSCODE = function(filename, prefix, callback) {
 	   	})
 	   	.on('end', function(stdout, stderr) {
    			wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'complete', 'rendition': '720P_3000K'}));
-   		
+
    		    return callback(null, prefix + '_720p_3000k.mp4');
 	   	})
 	   	.saveToFile(_OUTPUT_PATH + '/' + prefix + '_720p_3000k.mp4')
@@ -841,9 +841,9 @@ SD_480P_TRANSCODE = function(filename, prefix, callback) {
 	.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '480P_1500K', 'command': commandLine}));
 	})
-	.on('progress', function(progress) {			
+	.on('progress', function(progress) {
 		progress['event'] = 'progress';
-		progress['rendition'] = '480P_1500K';			
+		progress['rendition'] = '480P_1500K';
 		wss.broadcast(JSON.stringify(progress));
 	})
 	.on('stderr', function(stderrLine) {
@@ -862,7 +862,7 @@ SD_480P_TRANSCODE = function(filename, prefix, callback) {
 	   	})
 	   	.on('end', function(stdout, stderr) {
    			wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'complete', 'rendition': '480P_1500K'}));
-   		   
+
    		    return callback(null, prefix + '_480p_1500k.mp4');
 	   	})
 	   	.saveToFile(_OUTPUT_PATH + '/' + prefix + '_480p_1500k.mp4')
@@ -879,9 +879,9 @@ SD_360P_TRANSCODE = function(filename, prefix, callback) {
 	.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '360P_850K', 'command': commandLine}));
 	})
-	.on('progress', function(progress) {			
+	.on('progress', function(progress) {
 		progress['event'] = 'progress';
-		progress['rendition'] = '360P_850K';			
+		progress['rendition'] = '360P_850K';
 		wss.broadcast(JSON.stringify(progress));
 	})
 	.on('stderr', function(stderrLine) {
@@ -900,7 +900,7 @@ SD_360P_TRANSCODE = function(filename, prefix, callback) {
 	   	})
 	   	.on('end', function(stdout, stderr) {
    			wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'complete', 'rendition': '360P_850K'}));
-   		    
+
    		    return callback(null, prefix + '_360p_850k.mp4');
 	   	})
 	   	.saveToFile(_OUTPUT_PATH + '/' + prefix + '_360p_850k.mp4')
@@ -917,9 +917,9 @@ SD_240P_TRANSCODE = function(filename, prefix, callback) {
 	.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '240P_400K', 'command': commandLine}));
 	})
-	.on('progress', function(progress) {			
+	.on('progress', function(progress) {
 		progress['event'] = 'progress';
-		progress['rendition'] = '240P_400K';			
+		progress['rendition'] = '240P_400K';
 		wss.broadcast(JSON.stringify(progress));
 	})
 	.on('stderr', function(stderrLine) {
@@ -941,7 +941,7 @@ SD_240P_TRANSCODE = function(filename, prefix, callback) {
 	   	})
 	   	.on('end', function(stdout, stderr) {
    			wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'complete', 'rendition': '240P_400K'}));
-   		
+
    		    return callback(null, prefix + '_240p_400k.mp4');
 	   	})
 	   	.saveToFile(_OUTPUT_PATH + '/' + prefix + '_240p_400k.mp4')
@@ -960,9 +960,9 @@ AAC_128KBPS_HLS = function(filename, callback) {
 	.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': 'AAC_128KBPS', 'command': commandLine}));
 	})
-	.on('progress', function(progress) {			
+	.on('progress', function(progress) {
 		progress['event'] = 'progress';
-		progress['rendition'] = 'AAC_128KBPS';			
+		progress['rendition'] = 'AAC_128KBPS';
 		wss.broadcast(JSON.stringify(progress));
 	})
 	.on('stderr', function(stderrLine) {
@@ -986,9 +986,9 @@ AAC_128KBPS_M4A = function(filename, prefix, callback) {
 	.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'aac', 'status': 'start', 'rendition': 'AAC_128KBPS', 'command': commandLine}));
 	})
-	.on('progress', function(progress) {			
+	.on('progress', function(progress) {
 		progress['event'] = 'progress';
-		progress['rendition'] = 'AAC_128KBPS';			
+		progress['rendition'] = 'AAC_128KBPS';
 		wss.broadcast(JSON.stringify(progress));
 	})
 	.on('stderr', function(stderrLine) {
@@ -1078,9 +1078,9 @@ TRANSCODE_FILE_TO_HLS_AND_UPLOAD = function(filename, prefix, destination, _call
 			 	async.eachOfLimit(files, 100, function(absolute_fn, key, callback) {
 			 		if(!MIME_TYPE_LUT[path.extname(absolute_fn)]) return; // Only upload allowed extensions
 
-			 		var _options = { // GCS options 
+			 		var _options = { // GCS options
 			 			resumable: false, // default is true for files >5MB
-			 			validation: false, // Disable crc32/md5 checksum validation 
+			 			validation: false, // Disable crc32/md5 checksum validation
 			 			destination: path.join(destination, path.relative(_OUTPUT_PATH, absolute_fn)),
 			 			metadata: {
 			 				contentType: MIME_TYPE_LUT[path.extname(absolute_fn)],
@@ -1150,7 +1150,7 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 					mp4_360p: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results[3]),
 					mp4_480p: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results[2]),
 					mp4_720p: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results[1]),
-					thumbnails: JSON.stringify(results[0].map(function(e) {return 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, e)}))
+					thumbnails: JSON.stringify(results[0].map(function(e) {return 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, 'thumbs', e)}))
 				};
 
 				request.put({
