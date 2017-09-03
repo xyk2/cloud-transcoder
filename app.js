@@ -801,6 +801,7 @@ HD_720P_TRANSCODE = function(filename, prefix, callback) {
 	.videoBitrate(3000)
 	.audioBitrate('128k')
 	.size('1280x720')
+	.renice(-10)
 	.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '720P_3000K', 'command': commandLine}));
 
@@ -841,6 +842,7 @@ SD_480P_TRANSCODE = function(filename, prefix, callback) {
 	.videoBitrate(1500)
 	.audioBitrate('128k')
 	.size('854x480')
+	.renice(-10)
 	.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '480P_1500K', 'command': commandLine}));
 	})
@@ -880,6 +882,7 @@ SD_360P_TRANSCODE = function(filename, prefix, callback) {
 	.videoBitrate(850)
 	.audioBitrate('128k')
 	.size('640x360')
+	.renice(-10)
 	.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '360P_850K', 'command': commandLine}));
 	})
@@ -919,6 +922,7 @@ SD_240P_TRANSCODE = function(filename, prefix, callback) {
 	.videoBitrate(400)
 	.audioBitrate('128k')
 	.size('352x240')
+	.renice(-10)
 	.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '240P_400K', 'command': commandLine}));
 	})
