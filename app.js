@@ -800,9 +800,15 @@ HD_720P_TRANSCODE = function(filename, prefix, callback) {
 	_HD_720P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 	.videoBitrate(3000)
 	.audioBitrate('128k')
-	.size('1280x720')
-	.renice(-10)
-	.on('start', function(commandLine) {
+	.renice(-10);
+
+	if(path.extname(filename) == '.avi') {
+		_HD_720P.outputOptions('-filter:v', "yadif=0, scale=w=1280:h=720'");
+		_HD_720P.outputOptions('-pix_fmt', 'yuv420p');
+	}
+	else _HD_720P.outputOptions('-filter:v', 'scale=w=1280:h=720');
+
+	_HD_720P.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '720P_3000K', 'command': commandLine}));
 
 	})
@@ -841,9 +847,17 @@ SD_480P_TRANSCODE = function(filename, prefix, callback) {
 	_SD_480P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 	.videoBitrate(1500)
 	.audioBitrate('128k')
-	.size('854x480')
-	.renice(-10)
-	.on('start', function(commandLine) {
+	.renice(-10);
+
+
+	if(path.extname(filename) == '.avi') {
+		_SD_480P.outputOptions('-filter:v', "yadif=0, scale=w=854:h=480'");
+		_SD_480P.outputOptions('-pix_fmt', 'yuv420p');
+	}
+	else _SD_480P.outputOptions('-filter:v', 'scale=w=854:h=480');
+
+
+	_SD_480P.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '480P_1500K', 'command': commandLine}));
 	})
 	.on('progress', function(progress) {
@@ -881,9 +895,16 @@ SD_360P_TRANSCODE = function(filename, prefix, callback) {
 	_SD_360P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 	.videoBitrate(850)
 	.audioBitrate('128k')
-	.size('640x360')
-	.renice(-10)
-	.on('start', function(commandLine) {
+	.renice(-10);
+
+	if(path.extname(filename) == '.avi') {
+		_SD_360P.outputOptions('-filter:v', "yadif=0, scale=w=640:h=360'");
+		_SD_360P.outputOptions('-pix_fmt', 'yuv420p');
+	}
+	else _SD_360P.outputOptions('-filter:v', 'scale=w=640:h=360');
+
+
+	_SD_360P.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '360P_850K', 'command': commandLine}));
 	})
 	.on('progress', function(progress) {
@@ -921,9 +942,16 @@ SD_240P_TRANSCODE = function(filename, prefix, callback) {
 	_SD_240P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 	.videoBitrate(400)
 	.audioBitrate('128k')
-	.size('352x240')
-	.renice(-10)
-	.on('start', function(commandLine) {
+	.renice(-10);
+
+	if(path.extname(filename) == '.avi') {
+		_SD_240P.outputOptions('-filter:v', "yadif=0, scale=w=352:h=240'");
+		_SD_240P.outputOptions('-pix_fmt', 'yuv420p');
+	}
+	else _SD_240P.outputOptions('-filter:v', 'scale=w=352:h=240');
+
+
+	_SD_240P.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '240P_400K', 'command': commandLine}));
 	})
 	.on('progress', function(progress) {
