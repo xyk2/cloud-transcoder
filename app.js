@@ -470,7 +470,7 @@ function hlsTranscode(req, res, next) {
 		console.log("postToBroadcastCXLibrary");
 
 		_PUT_BODY = req.body.api;
-		_PUT_BODY['masterPlaylistUrl'] = 'http://cdn-google.broadcast.cx/' + _GCS_BASEPATH + 'index.m3u8';
+		_PUT_BODY['masterPlaylistUrl'] = 'https://cdn-google.broadcast.cx/' + _GCS_BASEPATH + 'index.m3u8';
 
 		request.put({uri: _API_HOST + '/videos/' + uuid, json: _PUT_BODY}, function(err, response, body) {
 			if (err) return console.error(err);
@@ -478,7 +478,7 @@ function hlsTranscode(req, res, next) {
 			console.log(body);
 
 			for(var index in _thumbnailFiles) {
-				_thumbnailFiles[index]['thumbnailUrl'] = 'http://cdn-google.broadcast.cx/' + _GCS_BASEPATH + _thumbnailFiles[index]['thumbnailUrl'];
+				_thumbnailFiles[index]['thumbnailUrl'] = 'https://cdn-google.broadcast.cx/' + _GCS_BASEPATH + _thumbnailFiles[index]['thumbnailUrl'];
 				request.post({uri: _API_HOST + '/thumbnails/' + uuid, json: _thumbnailFiles[index]}, function(err, response, body) {
 					if (err) return console.error(err);
 					console.log(body);
@@ -486,7 +486,7 @@ function hlsTranscode(req, res, next) {
 			}
 
 			for(var index in _MP4Files) {
-				_MP4Files[index]['videoUrl'] = 'http://cdn-google.broadcast.cx/' + _GCS_BASEPATH + _MP4Files[index]['videoUrl'];
+				_MP4Files[index]['videoUrl'] = 'https://cdn-google.broadcast.cx/' + _GCS_BASEPATH + _MP4Files[index]['videoUrl'];
 				request.post({uri: _API_HOST + '/videoTranscodeProfiles/' + uuid, json: _MP4Files[index]}, function(err, response, body) {
 					if (err) return console.error(err);
 					console.log(body);
@@ -598,8 +598,8 @@ function highlights(req, res, next) {
 				_trimLength = (req.body.highlights[x].endTime - req.body.highlights[x].startTime)/1000;
 				_trimmingOptions = ['-ss ' + (req.body.highlights[x].startTime/1000).toFixed(1), '-t ' + _trimLength];
 
-				req.body.highlights[x].videoUrl = 'http://cdn-google.broadcast.cx/highlights/' + _gcsFilename;
-				req.body.highlights[x].thumbnailUrl = 'http://cdn-google.broadcast.cx/highlights/' + _gcsThumbnailFilename;
+				req.body.highlights[x].videoUrl = 'https://cdn-google.broadcast.cx/highlights/' + _gcsFilename;
+				req.body.highlights[x].thumbnailUrl = 'https://cdn-google.broadcast.cx/highlights/' + _gcsThumbnailFilename;
 
 				if(_trimLength > 1) {
 				// Ensure no 0 lengths
@@ -1216,12 +1216,12 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 			function(callback) { // Update assets_game_footage table with urls
 				console.log("PUTTING TO assets_game_footage");
 				_PUT_BODY = {
-					hls_playlist_url: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[6]),
-					mp4_240p: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[4]),
-					mp4_360p: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[3]),
-					mp4_480p: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[2]),
-					mp4_720p: 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[1]),
-					thumbnails: JSON.stringify(results.filenames[0].map(function(e) {return 'http://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, 'thumbs', e)})),
+					hls_playlist_url: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[6]),
+					mp4_240p: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[4]),
+					mp4_360p: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[3]),
+					mp4_480p: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[2]),
+					mp4_720p: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[1]),
+					thumbnails: JSON.stringify(results.filenames[0].map(function(e) {return 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, 'thumbs', e)})),
 					duration: results.duration
 				};
 
