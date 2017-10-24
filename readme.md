@@ -1,14 +1,13 @@
 # FFMPEG runner for NodeJS and GCS
 
 ### Configuring boot disk template
-
 ```bash
-sudo add-apt-repository ppa:jonathonf/ffmpeg-3
+sudo add-apt-repository ppa:jonathonf/ffmpeg-3 # Enter to confirm
 sudo apt-get update
 sudo apt-get -y upgrade
 sudo apt install -y ffmpeg libav-tools x264 x265
 
-curl -sL https://deb.nodesource.com/setup_6.x -o nodesource_setup.sh
+sudo curl -sL https://deb.nodesource.com/setup_6.x -o nodesource_setup.sh
 sudo bash nodesource_setup.sh
 sudo apt-get install nodejs -y
 
@@ -18,23 +17,27 @@ sudo npm install pm2 -g
 sudo iptables -t nat -I PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080
 
 
-# Create RSA private key then copy to Github repo (pull access only)
-ssh-keygen -t rsa
-cat /home/kaoxiaoyang/.ssh/id_rsa.pub
+# Create ROOT RSA private key then copy to Github repo (pull access only)
+sudo ssh-keygen -t rsa
+sudo cat /root/.ssh/id_rsa.pub
 
 ```
 
 
-### Startup script for each instance
+### Startup script for each new instance
 ```bash
-ssh-keyscan github.com >> ~/.ssh/known_hosts # Add github addresses to known SSH hosts
+#! /bin/bash
+
+ssh-keyscan github.com >> ~/.ssh/known_hosts
 git clone git@github.com:xyk2/broadcast.cx-ffmpeg-runner.git
 
-cd ~/broadcast.cx-ffmpeg-runner
+cd /broadcast.cx-ffmpeg-runner
 npm install
-NODE_ENV=production pm2 start app.js
+PM2_HOME=/root/.pm2 NODE_ENV=production pm2 start app.js
 ```
 
 
 
-
+### Shutdown script before preemption
+* Call localhost endpoint to reset running job in DB queue
+* Terminate PM2

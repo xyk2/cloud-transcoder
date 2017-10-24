@@ -42,9 +42,9 @@ server.use(restify.fullResponse());
 
 
 if(process.env.NODE_ENV == 'production') {
-	_INPUT_PATH = './_inputs';
-	_OUTPUT_PATH = './_outputs';
-	_PRESETS_PATH = './presets';
+	_INPUT_PATH = process.env.PWD + '/_inputs';
+	_OUTPUT_PATH = process.env.PWD + '/_outputs';
+	_PRESETS_PATH = process.env.PWD + '/presets';
 	_API_HOST = 'http://api.broadcast.cx';
 	_PORT = 8080; // 8080 forwarded to 80 with iptables rule
 	_WS_PORT = 8081;
