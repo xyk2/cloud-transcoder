@@ -41,15 +41,13 @@ server.pre(restify.CORS()); // Enable CORS headers
 server.use(restify.fullResponse());
 
 
-// Semi-Hack: If environment path is same as GCS, then assume from GCS
-if(process.env.PWD == '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner') {
-	_INPUT_PATH = '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_inputs';
-	_OUTPUT_PATH = '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/_outputs';
-	_PRESETS_PATH = '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner/presets';
+if(process.env.NODE_ENV == 'production') {
+	_INPUT_PATH = './_inputs';
+	_OUTPUT_PATH = './_outputs';
+	_PRESETS_PATH = './presets';
 	_API_HOST = 'http://api.broadcast.cx';
 	_PORT = 8080; // 8080 forwarded to 80 with iptables rule
 	_WS_PORT = 8081;
-	_ENV = 'production';
 
 } else { // Running local on development
 	_INPUT_PATH = '/Users/XYK/Desktop/Dropbox/broadcast.cx-ffmpeg-runner/_inputs';
@@ -60,7 +58,6 @@ if(process.env.PWD == '/usr/local/ffmpeg-runner/broadcast.cx-ffmpeg-runner') {
 	ffmpeg.setFfprobePath('/Users/XYK/Desktop/ffprobe');
 	_PORT = 8080;
 	_WS_PORT = 8081;
-	_ENV = 'development';
 }
 
 const wss = new WebSocket.Server({ port: _WS_PORT });
@@ -1172,7 +1169,7 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 
 	async.waterfall([
 		function(callback) { // Clear input directory if running on prod
-			if(_ENV == 'development') return callback();
+			if(process.env.NODE_ENV == 'development') return callback();
 			fs.emptyDir(_INPUT_PATH, err => { // Clear out input path
 				if (err) return callback(err);
 				return callback();
