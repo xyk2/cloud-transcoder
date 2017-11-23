@@ -1352,16 +1352,15 @@ MASTER_TRIM = function(filename, job, callback) {
 					mp4_720p: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[1]),
 					thumbnails: JSON.stringify(results.filenames[0].map(function(e) {return 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, 'thumbs', e)})),
 					duration: results.duration,
-
-					uuid: uuid,
-					type: job.parameters.api.type,
 					source_game_footage_id: job.asset_game_footage_id,
-					title: job.parameters.api.title,
-					description: job.parameters.api.description,
+					uuid: uuid
 				};
 
+				_POST_BODY = Object.assign(_POST_BODY, job.parameters.api);
+				console.log(_POST_BODY);
+
 				request.post({
-					url: _API_HOST + '/v2/videos/',
+					url: _API_HOST + '/v2/videos',
 					method: 'POST',
 					json: _POST_BODY
 				}, function(error, response, body) {
@@ -1371,32 +1370,8 @@ MASTER_TRIM = function(filename, job, callback) {
 		], function(err, response) {
 			_transcodeInProgress = false;
 		});
-
-
-
 	});
-
-
 }
-
-
-
-//MASTER_TRIM('展昭國際vs三好美_myStreamA_720p_2017-11-11-09.25.18.128-UTC_0.mp4', {
-//	startTime: 3000,
-//	endTime: 3005,
-//	api: {
-//
-//	}
-//});
-
-
-
-
-
-
-
-
-
 
 
 
