@@ -1293,7 +1293,7 @@ MASTER_TRIM = function(filename, job, callback) {
 
 	async.waterfall([
 		function(callback) {
-			if(!job.parameters || !job.parameters.startTime || !job.parameters.endTime || !job.parameters.api) {
+			if(!job.parameters || !('startTime' in job.parameters) || !('endTime' in job.parameters) || !job.parameters.api) {
 				return callback("Incorrect / missing information in parameter.");
 			} else {
 				callback();
