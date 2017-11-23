@@ -1,7 +1,7 @@
 exports.load = function(ffmpeg) {
   ffmpeg
-    .outputOptions('-c:a', 'copy')
-    //.outputOptions('-preset', 'veryfast')
+    //.outputOptions('-c:a', 'copy')
+    .outputOptions('-preset', 'veryfast')
     //.outputOptions('-x264-params', 'keyint=60:min-keyint=60:scenecut=-1')
     .outputOptions('-profile:v', 'high')
     .outputOptions('-level', '4.0')

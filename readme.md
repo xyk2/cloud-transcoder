@@ -35,7 +35,6 @@ PM2_HOME=/root/.pm2 NODE_ENV=production pm2 start app.js
 ```
 
 
-
 ### Shutdown script before preemption
 * Call localhost endpoint to reset running job in DB queue
 * Terminate PM2
@@ -54,8 +53,6 @@ PM2_HOME=/root/.pm2 NODE_ENV=production pm2 start app.js
 ### Useful snippets
 `youtube-dl`
 youtube-dl --external-downloader aria2c --external-downloader-args '-x 8' https://www.youtube.com/playlist?list=PLUz3zvlwsLgWJRmJo8fLOTMiXkFC25S61 --playlist-start 46 --playlist-end 150
-
-youtube-dl --external-downloader aria2c --external-downloader-args '-x 8' https://www.youtube.com/playlist?list=PLUz3zvlwsLgWJRmJo8fLOTMiXkFC25S61 --playlist-start 151 --playlist-end 180
 
 
 

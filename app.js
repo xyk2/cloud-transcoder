@@ -8,6 +8,9 @@ var request = require('request');
 var async = require('async');
 const uuidv4 = require('uuid/v4')
 var m3u8Parser = require('m3u8-parser');
+var Raven = require('raven');
+
+Raven.config('https://c790451322a743ea89955afd471c2985:2b9c188e39444388a717d04b73b3ad5f@sentry.io/249073').install();
 
 var MIME_TYPE_LUT = {
 	'.m3u8': 'application/x-mpegURL',
@@ -26,7 +29,6 @@ var google_cloud = require('google-cloud')({
 var gcs = google_cloud.storage();
 var bucket = gcs.bucket('broadcast-cx-raw-recordings');
 var dest_bucket = gcs.bucket('cx-video-content');
-//var dest_bucket = gcs.bucket('cx-videos');
 
 var server = restify.createServer({
 	name: 'ffmpeg-runner'
@@ -793,11 +795,16 @@ function fullGameTranscodeToMP4HLS(req, res, next) {
 
 
 
-HD_720P_TRANSCODE = function(filename, prefix, callback) {
+HD_720P_TRANSCODE = function(filename, prefix, startTime, endTime, callback) {
 	_HD_720P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 	.videoBitrate(3000)
 	.audioBitrate('128k')
 	.renice(-10);
+
+	if(startTime && endTime) {
+		_HD_720P.seekInput(startTime-10 < 0 ? 0 : startTime - 10);
+		_HD_720P.outputOptions(['-ss ' + (startTime).toFixed(2), '-t ' + (endTime - startTime), '-copyts']);
+	}
 
 	if(path.extname(filename) == '.avi') {
 		_HD_720P.outputOptions('-filter:v', "yadif=0, scale=w=1280:h=720'");
@@ -840,12 +847,16 @@ HD_720P_TRANSCODE = function(filename, prefix, callback) {
 	.saveToFile(_OUTPUT_PATH + '/hls/720p_3000k.m3u8');
 }
 
-SD_480P_TRANSCODE = function(filename, prefix, callback) {
+SD_480P_TRANSCODE = function(filename, prefix, startTime, endTime, callback) {
 	_SD_480P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 	.videoBitrate(1500)
 	.audioBitrate('128k')
 	.renice(-10);
 
+	if(startTime && endTime) {
+		_SD_480P.seekInput(startTime-10 < 0 ? 0 : startTime - 10);
+		_SD_480P.outputOptions(['-ss ' + (startTime).toFixed(2), '-t ' + (endTime - startTime), '-copyts']);
+	}
 
 	if(path.extname(filename) == '.avi') {
 		_SD_480P.outputOptions('-filter:v', "yadif=0, scale=w=854:h=480'");
@@ -888,11 +899,16 @@ SD_480P_TRANSCODE = function(filename, prefix, callback) {
 	.saveToFile(_OUTPUT_PATH + '/hls/480p_1500k.m3u8');
 }
 
-SD_360P_TRANSCODE = function(filename, prefix, callback) {
+SD_360P_TRANSCODE = function(filename, prefix, startTime, endTime, callback) {
 	_SD_360P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 	.videoBitrate(850)
 	.audioBitrate('128k')
 	.renice(-10);
+
+	if(startTime && endTime) {
+		_SD_360P.seekInput(startTime-10 < 0 ? 0 : startTime - 10);
+		_SD_360P.outputOptions(['-ss ' + (startTime).toFixed(2), '-t ' + (endTime - startTime), '-copyts']);
+	}
 
 	if(path.extname(filename) == '.avi') {
 		_SD_360P.outputOptions('-filter:v', "yadif=0, scale=w=640:h=360'");
@@ -935,11 +951,16 @@ SD_360P_TRANSCODE = function(filename, prefix, callback) {
 	.saveToFile(_OUTPUT_PATH + '/hls/360p_850k.m3u8');
 }
 
-SD_240P_TRANSCODE = function(filename, prefix, callback) {
+SD_240P_TRANSCODE = function(filename, prefix, startTime, endTime, callback) {
 	_SD_240P = ffmpeg(filename, { presets: _PRESETS_PATH }).preset('hls')
 	.videoBitrate(400)
 	.audioBitrate('128k')
 	.renice(-10);
+
+	if(startTime && endTime) {
+		_SD_240P.seekInput(startTime-10 < 0 ? 0 : startTime - 10);
+		_SD_240P.outputOptions(['-ss ' + (startTime).toFixed(2), '-t ' + (endTime - startTime), '-copyts']);
+	}
 
 	if(path.extname(filename) == '.avi') {
 		_SD_240P.outputOptions('-filter:v', "yadif=0, scale=w=352:h=240'");
@@ -984,15 +1005,21 @@ SD_240P_TRANSCODE = function(filename, prefix, callback) {
 	.saveToFile(_OUTPUT_PATH + '/hls/240p_400k.m3u8');
 }
 
-AAC_128KBPS_HLS = function(filename, callback) {
+AAC_128KBPS_HLS = function(filename, startTime, endTime, callback) {
 	_AAC_128KBPS = ffmpeg(filename, { presets: _PRESETS_PATH })
 	.noVideo()
 	.audioBitrate('128k')
 	.outputOptions('-c:a', 'aac')
 	.outputOptions('-hls_time', '6')
 	.outputOptions('-hls_list_size', '0')
-	.outputOptions('-f', 'hls')
-	.on('start', function(commandLine) {
+	.outputOptions('-f', 'hls');
+
+	if(startTime && endTime) {
+		_AAC_128KBPS.seekInput(startTime-10 < 0 ? 0 : startTime - 10);
+		_AAC_128KBPS.outputOptions(['-ss ' + (startTime).toFixed(2), '-t ' + (endTime - startTime), '-copyts']);
+	}
+
+	_AAC_128KBPS.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': 'AAC_128KBPS', 'command': commandLine}));
 	})
 	.on('progress', function(progress) {
@@ -1014,12 +1041,18 @@ AAC_128KBPS_HLS = function(filename, callback) {
 	.saveToFile(_OUTPUT_PATH + '/hls/128kbps_aac.m3u8');
 }
 
-AAC_128KBPS_M4A = function(filename, prefix, callback) {
+AAC_128KBPS_M4A = function(filename, prefix, startTime, endTime, callback) {
 	_AAC_128KBPS = ffmpeg(filename, { presets: _PRESETS_PATH })
 	.noVideo()
 	.audioBitrate('128k')
-	.outputOptions('-c:a', 'aac')
-	.on('start', function(commandLine) {
+	.outputOptions('-c:a', 'aac');
+
+	if(startTime && endTime) {
+		_AAC_128KBPS.seekInput(startTime-10 < 0 ? 0 : startTime - 10);
+		_AAC_128KBPS.outputOptions(['-ss ' + (startTime).toFixed(2), '-t ' + (endTime - startTime), '-copyts']);
+	}
+
+	_AAC_128KBPS.on('start', function(commandLine) {
 	    wss.broadcast(JSON.stringify({'event': 'aac', 'status': 'start', 'rendition': 'AAC_128KBPS', 'command': commandLine}));
 	})
 	.on('progress', function(progress) {
@@ -1041,28 +1074,39 @@ AAC_128KBPS_M4A = function(filename, prefix, callback) {
 	.saveToFile(_OUTPUT_PATH + '/' + prefix + '_128kbps_aac.m4a');
 }
 
-CREATE_THUMBNAILS = function(filename, callback) {
+CREATE_THUMBNAILS = function(filename, startTime, endTime, callback) {
 	_thumbnailFiles = [];
 
-	ffmpeg(filename)
-	  	.on('filenames', function(filenames) {
-			wss.broadcast(JSON.stringify({'event': 'thumbnail', 'status': 'start', 'files': filenames}));
-			_thumbnailFiles = filenames;
-	  	})
-		.on('end', function() {
-			wss.broadcast(JSON.stringify({'event': 'thumbnail', 'status': 'complete'}));
-			return callback(null, _thumbnailFiles);
-		})
-		.on('error', function(err, stdout, stderr) {
-			wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
-			return callback(err.message);
-		})
-		.screenshots({
-			count: 5, // Will take screens at 20%, 40%, 60% and 80% of the video
-			folder: _OUTPUT_PATH + '/thumbs',
-			filename: 'thumbnail_%s_%00i_%r.jpg',
-			size: '640x360'
-		});
+	_THUMBNAILS = ffmpeg(filename);
+	_OPTIONS = {
+		count: 5, // Will take screens at 20%, 40%, 60% and 80% of the video
+		folder: _OUTPUT_PATH + '/thumbs',
+		filename: 'thumbnail_%s_%00i_%r.jpg',
+		size: '640x360'
+	};
+
+	if(startTime && endTime) { // if start/end time specified, take screenshots in between startTime and endTime
+		_OPTIONS.timemarks = [];
+		_OPTIONS.timemarks.push(startTime);
+		_OPTIONS.timemarks.push(startTime + ((endTime - startTime) / 3) * 1);
+		_OPTIONS.timemarks.push(startTime + ((endTime - startTime) / 3) * 2);
+		_OPTIONS.timemarks.push(startTime + ((endTime - startTime) / 3) * 3);
+		_OPTIONS.timemarks.push(endTime);
+	}
+
+  	_THUMBNAILS.on('filenames', function(filenames) {
+		wss.broadcast(JSON.stringify({'event': 'thumbnail', 'status': 'start', 'files': filenames}));
+		_thumbnailFiles = filenames;
+  	})
+	.on('end', function() {
+		wss.broadcast(JSON.stringify({'event': 'thumbnail', 'status': 'complete'}));
+		return callback(null, _thumbnailFiles);
+	})
+	.on('error', function(err, stdout, stderr) {
+		wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
+		return callback(err.message);
+	})
+	.screenshots(_OPTIONS);
 }
 
 CREATE_INDEX_M3U8 = function(callback) {
@@ -1075,6 +1119,7 @@ GCS_UPLOAD_RECURSIVE = function(file, options, callback) {
 	dest_bucket.upload(file, options, function(err, gFileObj) {
 		if(err) {
 			console.log("File upload failed for " + file + ", trying again.");
+			Raven.captureException(err);
 			GCS_UPLOAD_RECURSIVE(file, options, callback); // retry if error
 			return;
 		}
@@ -1085,7 +1130,7 @@ GCS_UPLOAD_RECURSIVE = function(file, options, callback) {
 	});
 }
 
-TRANSCODE_FILE_TO_HLS_AND_UPLOAD = function(filename, prefix, destination, _callback) {
+TRANSCODE_FILE_TO_HLS_AND_UPLOAD = function(filename, prefix, startTime, endTime, destination, _callback) {
 	async.waterfall([
 		function(callback) { // Clear output directories
 			fs.emptyDir(_OUTPUT_PATH, err => { // Clear out output path of old m3u8 files
@@ -1096,15 +1141,15 @@ TRANSCODE_FILE_TO_HLS_AND_UPLOAD = function(filename, prefix, destination, _call
 			});
 		},
 		function(callback) { // Run transcodes in parallel
-			async.parallel([
-				function(callback) { CREATE_THUMBNAILS(filename, callback); },
-				function(callback) { HD_720P_TRANSCODE(filename, prefix, callback); },
-				function(callback) { SD_480P_TRANSCODE(filename, prefix, callback); },
-				function(callback) { SD_360P_TRANSCODE(filename, prefix, callback); },
-				function(callback) { SD_240P_TRANSCODE(filename, prefix, callback); },
-				function(callback) { AAC_128KBPS_M4A(filename, prefix, callback); },
+			async.parallel([ // ORDER MATTERS HERE
+				function(callback) { CREATE_THUMBNAILS(filename, startTime, endTime, callback); },
+				function(callback) { HD_720P_TRANSCODE(filename, prefix, startTime, endTime, callback); },
+				function(callback) { SD_480P_TRANSCODE(filename, prefix, startTime, endTime, callback); },
+				function(callback) { SD_360P_TRANSCODE(filename, prefix, startTime, endTime, callback); },
+				function(callback) { SD_240P_TRANSCODE(filename, prefix, startTime, endTime, callback); },
+				function(callback) { AAC_128KBPS_M4A(filename, prefix, startTime, endTime, callback); },
 				function(callback) { CREATE_INDEX_M3U8(callback); },
-				function(callback) { AAC_128KBPS_HLS(filename, callback); }
+				function(callback) { AAC_128KBPS_HLS(filename, startTime, endTime, callback); }
 			],
 			function(err, results) {
 				if(err) return _callback(err);
@@ -1169,8 +1214,8 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 
 	async.waterfall([
 		function(callback) { // Clear input directory if running on prod
-			if(process.env.NODE_ENV == 'development') return callback();
-			fs.emptyDir(_INPUT_PATH, err => { // Clear out input path
+			if(process.env.NODE_ENV != 'production') return callback();
+			fs.emptyDir(_INPUT_PATH, err => { // Clear out input path so storage doesn't fill up on instance
 				if (err) return callback(err);
 				return callback();
 			});
@@ -1191,10 +1236,11 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 			}
 		},
 		function(callback) {
-			TRANSCODE_FILE_TO_HLS_AND_UPLOAD(path.join(_INPUT_PATH, filename), uuid, _GCS_BASEPATH, callback);
+			TRANSCODE_FILE_TO_HLS_AND_UPLOAD(path.join(_INPUT_PATH, filename), uuid, null, null, _GCS_BASEPATH, callback);
 		}
 	], function(err, results) {
 		if(err) {
+			Raven.captureException(err);
 			return request.put({
 				url: _API_HOST + '/v2/transcode/jobs/' + job.id + '/error',
 				method: 'PUT',
@@ -1239,6 +1285,121 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 
 
 
+MASTER_TRIM = function(filename, job, callback) {
+	_transcodeInProgress = true;
+	uuid = uuidv4();
+
+	_GCS_BASEPATH = path.join('events', uuid);
+
+	async.waterfall([
+		function(callback) {
+			if(!job.parameters || !job.parameters.startTime || !job.parameters.endTime || !job.parameters.api) {
+				return callback("Incorrect / missing information in parameter.");
+			} else {
+				callback();
+			}
+		},
+		function(callback) { // Clear input directory if running on prod
+			if(process.env.NODE_ENV != 'production') return callback();
+			fs.emptyDir(_INPUT_PATH, err => { // Clear out input path so storage doesn't fill up on instance
+				if (err) return callback(err);
+				return callback();
+			});
+		},
+		function(callback) { // Download file
+			if(fs.existsSync(path.join(_INPUT_PATH, filename))) { // If file already downloaded in local directory, use that instead of downloading again
+				wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': filename}));
+				return callback();
+			} else { // TODO: upgrade to aria2c, significantly faster
+				bucket.file(filename).download({ destination: path.join(_INPUT_PATH, filename) }, function(err) {
+					if(err) { // Error handling (bucket file not found in GCS)
+						wss.broadcast(JSON.stringify({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message}));
+						return callback(err.code + ' ' + err.message);
+					}
+					wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': filename}));
+					return callback();
+				});
+			}
+		},
+		function(callback) {
+			TRANSCODE_FILE_TO_HLS_AND_UPLOAD(path.join(_INPUT_PATH, filename), uuid, job.parameters.startTime, job.parameters.endTime, _GCS_BASEPATH, callback);
+		}
+	], function(err, results) {
+		if(err) {
+			Raven.captureException(err);
+			return request.put({
+				url: _API_HOST + '/v2/transcode/jobs/' + job.id + '/error',
+				method: 'PUT',
+				json: { message: err }
+			}, function(error, response, body) {
+				_transcodeInProgress = false;
+				console.log('PUTTING TO assets_transcode_queue: ERROR')
+			});
+		}
+
+		async.parallel([
+			function(callback) { // Update queue status to FINISHED
+				console.log('PUTTING TO assets_transcode_queue: FINISHED');
+				request.put(_API_HOST + '/v2/transcode/jobs/' + job.id + '/finished', function(error, response, body) { callback(); });
+			},
+			function(callback) { // Update v2_videos table with urls
+				console.log("POST TO v2_videos");
+				_POST_BODY = {
+					hls_playlist_url: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[6]),
+					mp4_240p: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[4]),
+					mp4_360p: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[3]),
+					mp4_480p: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[2]),
+					mp4_720p: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[1]),
+					thumbnails: JSON.stringify(results.filenames[0].map(function(e) {return 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, 'thumbs', e)})),
+					duration: results.duration,
+
+					uuid: uuid,
+					type: job.parameters.api.type,
+					source_game_footage_id: job.asset_game_footage_id,
+					title: job.parameters.api.title,
+					description: job.parameters.api.description,
+				};
+
+				request.post({
+					url: _API_HOST + '/v2/videos/',
+					method: 'POST',
+					json: _POST_BODY
+				}, function(error, response, body) {
+					callback();
+				});
+			}
+		], function(err, response) {
+			_transcodeInProgress = false;
+		});
+
+
+
+	});
+
+
+}
+
+
+
+//MASTER_TRIM('展昭國際vs三好美_myStreamA_720p_2017-11-11-09.25.18.128-UTC_0.mp4', {
+//	startTime: 3000,
+//	endTime: 3005,
+//	api: {
+//
+//	}
+//});
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 setInterval(function() { // Poll DB for new jobs if there is no transcode in progress
@@ -1246,28 +1407,23 @@ setInterval(function() { // Poll DB for new jobs if there is no transcode in pro
 
 	async.waterfall([
 		function(callback) { // Get list of queued transcodes from the DB
-			request(_API_HOST + '/v2/transcode/jobs', function(error, response, body) {
+			request.put(_API_HOST + '/v2/transcode/jobs/request', function(error, response, body) {
 				if(error) return callback('Error connecting to queue.');
 				if(JSON.parse(body).length == 0) return callback('No jobs in the queue.');
 
-				callback(null, JSON.parse(body)[0]);
-			});
-		},
-		function(job, callback) { // Immediately follow by setting job status to IN_PROGRESS
-			request.put(_API_HOST + '/v2/transcode/jobs/' + job.id + '/start', function(error, response, body) {
-				_transcodeInProgress = true;
-				callback(null, job);
+				callback(null, JSON.parse(body));
 			});
 		},
 		function(job, callback) {
-			MASTER_GAME_FOOTAGE_HLS(job.filename, job, callback);
-			console.log(job);
+			_transcodeInProgress = true;
+
+			if(job.type == 'fullGame') MASTER_GAME_FOOTAGE_HLS(job.filename, job, callback);
+			if(job.type == 'event') MASTER_TRIM(job.filename, job, callback);
 		}
 	], function(err, response) {
 		if(err) return console.log(err);
-		console.log('response');
 	});
-}, 2000);
+}, 2000 + Math.floor(Math.random() * 1000)); // Keep initialization times somewhat random
 
 
 server.listen(_PORT, function() {

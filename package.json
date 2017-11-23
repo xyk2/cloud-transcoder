@@ -13,6 +13,7 @@
     "m3u8-parser": "^3.0.0",
     "node-dir": "^0.1.17",
     "pg": "^6.4.2",
+    "raven": "^2.2.1",
     "request": "^2.80.0",
     "restify": "^4.3.1",
     "restify-plugins": "^1.6.0",
