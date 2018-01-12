@@ -10,6 +10,6 @@ exports.load = function(ffmpeg) {
     .outputOptions('-start_number', '0')
     .outputOptions('-hls_time', '6')
     .outputOptions('-hls_list_size', '0')
-    .outputOptions('-max_muxing_queue_size', '1024')
+    .outputOptions('-max_muxing_queue_size', '1024') // Some MP4s coming from Wowza error out on start because buffer is too small
     .outputOptions('-f', 'hls');
 };

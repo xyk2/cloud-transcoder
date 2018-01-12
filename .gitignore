@@ -55,3 +55,9 @@ AWS_access_keys
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
 
+_outputs/hls/*.ts
+_outputs/*.m3u8
+_outputs/*.m4a
+_outputs/hls/*.m3u8
+_outputs/*.mp4
+_outputs/thumbs/*.jpg
