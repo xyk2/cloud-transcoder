@@ -1257,7 +1257,7 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 				request.put(_API_HOST + '/v2/transcode/jobs/' + job.id + '/finished', function(error, response, body) { callback(); });
 			},
 			function(callback) { // Update assets_game_footage table with urls
-				console.log("PUTTING TO assets_game_footage");
+				console.log("PUTTING TO assets_game_footage " + '/v2/assets/game_footage/' + job.asset_game_footage_id);
 				_PUT_BODY = {
 					hls_playlist_url: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[6]),
 					mp4_240p: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results.filenames[4]),
