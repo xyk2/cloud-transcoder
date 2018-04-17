@@ -10,7 +10,18 @@ const uuidv4 = require('uuid/v4')
 var m3u8Parser = require('m3u8-parser');
 var Raven = require('raven');
 
-Raven.config('https://c790451322a743ea89955afd471c2985:2b9c188e39444388a717d04b73b3ad5f@sentry.io/249073').install();
+// Grab machine details from GCP if available, otherwise null
+var machine_details = {};
+
+request({
+	url: 'http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true',
+	headers: { 'Metadata-Flavor': 'Google' },
+	timeout: 1500
+}, function(error, response, body) {
+	if(error) return; // If times out or no response at all
+	else machine_details = JSON.parse(body);
+});
+
 
 var MIME_TYPE_LUT = {
 	'.m3u8': 'application/x-mpegURL',
@@ -19,6 +30,7 @@ var MIME_TYPE_LUT = {
 	'.mp4': 'video/mp4',
 	'.m4a': 'audio/mp4'
 }
+
 var _transcodeInProgress = false;
 
 var google_cloud = require('google-cloud')({
@@ -50,6 +62,7 @@ if(process.env.NODE_ENV == 'production') {
 	_API_HOST = 'http://api.broadcast.cx';
 	_PORT = 8080; // 8080 forwarded to 80 with iptables rule
 	_WS_PORT = 8081;
+	Raven.config('https://c790451322a743ea89955afd471c2985:2b9c188e39444388a717d04b73b3ad5f@sentry.io/249073').install();
 
 } else { // Running local on development
 	_INPUT_PATH = '/Users/XYK/Desktop/Dropbox/broadcast.cx-ffmpeg-runner/_inputs';
@@ -86,7 +99,6 @@ server.use(function(req, res, next) { // If transcode already in progress, throw
 	}
 	next();
 })
-
 
 function highlightReel(req, res, next) {
 	if(!req.params.filename || req.body.highlights.length == 0) {
@@ -664,12 +676,18 @@ MASTER_GAME_FOOTAGE_HLS = function(filename, job, callback) {
 			if(fs.existsSync(path.join(_INPUT_PATH, filename))) { // If file already downloaded in local directory, use that instead of downloading again
 				wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': filename}));
 				return callback();
+
 			} else { // TODO: upgrade to aria2c, significantly faster
+				var _download_start_time = Date.now();
+
 				bucket.file(filename).download({ destination: path.join(_INPUT_PATH, filename) }, function(err) {
 					if(err) { // Error handling (bucket file not found in GCS)
 						wss.broadcast(JSON.stringify({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message}));
 						return callback(err.code + ' ' + err.message);
 					}
+
+					request.put({ url: `${_API_HOST}/v2/transcode/jobs/${job.id}/download_meta`, json: { download_time: parseInt(Date.now() - _download_start_time), download_method: 'google-cloud' }}, function(error, response, body) { });
+
 					wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': filename}));
 					return callback();
 				});
@@ -748,12 +766,18 @@ MASTER_TRIM = function(filename, job, callback) {
 			if(fs.existsSync(path.join(_INPUT_PATH, filename))) { // If file already downloaded in local directory, use that instead of downloading again
 				wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': filename}));
 				return callback();
+
 			} else { // TODO: upgrade to aria2c, significantly faster
+				var _download_start_time = Date.now();
+
 				bucket.file(filename).download({ destination: path.join(_INPUT_PATH, filename) }, function(err) {
 					if(err) { // Error handling (bucket file not found in GCS)
 						wss.broadcast(JSON.stringify({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message}));
 						return callback(err.code + ' ' + err.message);
 					}
+
+					request.put({ url: `${_API_HOST}/v2/transcode/jobs/${job.id}/download_meta`, json: { download_time: parseInt(Date.now() - _download_start_time), download_method: 'google-cloud' }}, function(error, response, body) { });
+
 					wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': filename}));
 					return callback();
 				});
@@ -812,6 +836,195 @@ MASTER_TRIM = function(filename, job, callback) {
 }
 
 
+/*
+{
+	source_asset_id: 1212,
+	startTime: 10.0,
+	endTime: 19.1,
+	user_id: 1868,
+	title: 'LOL',
+	description: 'suckonthese'
+}
+*/
+
+MASTER_INDIVIDUAL_HIGHLIGHT = function(filename, job, callback) {
+	wss.broadcast(JSON.stringify({'event': 'mp4', 'status': 'pending', 'rendition': '720P_2000K'}));
+	wss.broadcast(JSON.stringify({'event': 'download', 'status': 'start', 'file': filename}));
+
+	_transcodeInProgress = true;
+
+	uuid = uuidv4();
+
+	_GCS_BASEPATH = path.join('individual_highlight', uuid);
+
+	async.waterfall([
+		// Check for correct parameters in the job
+		function(callback) {
+			if(!job.parameters || !('startTime' in job.parameters) || !('endTime' in job.parameters)) {
+				return callback("Incorrect / missing information in parameter.");
+			} else {
+				callback();
+			}
+		},
+		// Clear input directory if running on prod
+		function(callback) {
+			if(process.env.NODE_ENV != 'production') return callback();
+			fs.emptyDir(_INPUT_PATH, err => { // Clear out input path so storage doesn't fill up on instance
+				if (err) return callback(err);
+				return callback();
+			});
+		},
+		// Download file if it doesn't exist
+		function(callback) {
+			if(fs.existsSync(path.join(_INPUT_PATH, filename))) { // If file already downloaded in local directory, use that instead of downloading again
+				wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': filename}));
+				return callback();
+
+			} else {
+				// TODO: upgrade to aria2c, significantly faster
+				// Log download times
+
+				var _download_start_time = Date.now();
+
+				bucket.file(filename).download({ destination: path.join(_INPUT_PATH, filename) }, function(err) {
+					if(err) { // Error handling (bucket file not found in GCS)
+						wss.broadcast(JSON.stringify({'event': 'download', 'status': 'error', 'message': err.code + ' ' + err.message}));
+						return callback(err.code + ' ' + err.message);
+					}
+
+					request.put({ url: `${_API_HOST}/v2/transcode/jobs/${job.id}/download_meta`, json: { download_time: parseInt(Date.now() - _download_start_time), download_method: 'google-cloud' }}, function(error, response, body) { });
+
+					wss.broadcast(JSON.stringify({'event': 'download', 'status': 'complete', 'file': filename}));
+					return callback();
+				});
+			}
+		},
+		// Clear output directories
+		function(callback) {
+			fs.emptyDir(_OUTPUT_PATH, err => { // Clear out output path of old m3u8 files
+				if (err) return callback(err);
+				fs.mkdirSync(path.join(_OUTPUT_PATH, 'thumbs'));
+				callback();
+			});
+		},
+		function(callback) {
+			async.parallel([
+				(callback) => {
+					_HD_720P = ffmpeg(path.join(_INPUT_PATH, filename), { presets: _PRESETS_PATH }).preset('highlight_mp4')
+					.videoBitrate(2000)
+					.audioBitrate('96k')
+					.renice(-10);
+
+					if(job.parameters.startTime && job.parameters.endTime) {
+						_HD_720P.seekInput(job.parameters.startTime - 10 < 0 ? 0 : job.parameters.startTime - 10);
+						_HD_720P.outputOptions(['-ss ' + (job.parameters.startTime).toFixed(2), '-t ' + (job.parameters.endTime - job.parameters.startTime), '-copyts']);
+					}
+
+					if(path.extname(filename) == '.avi') {
+						_HD_720P.outputOptions('-filter:v', "yadif=0, scale=w=1280:h=720'");
+						_HD_720P.outputOptions('-pix_fmt', 'yuv420p');
+					}
+					else _HD_720P.outputOptions('-filter:v', 'scale=w=1280:h=720');
+
+					_HD_720P.on('start', function(commandLine) {
+					    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'start', 'rendition': '720P_2000K', 'command': commandLine}));
+					})
+					.on('progress', function(progress) {
+						progress['event'] = 'progress';
+						progress['rendition'] = '720P_2000K';
+						wss.broadcast(JSON.stringify(progress));
+					})
+					.on('stderr', function(stderrLine) {
+					    //console.log('Stderr output: ' + stderrLine);
+					})
+					.on('error', function(err, stdout, stderr) {
+						wss.broadcast(JSON.stringify({'event': 'error', 'message': err.message}));
+						return callback(err.message);
+					})
+					.on('end', function(stdout, stderr) {
+					    wss.broadcast(JSON.stringify({'event': 'm3u8', 'status': 'complete', 'rendition': '720P_2000K'}));
+
+				   		return callback(null, uuid + '_720p_3000k.mp4');
+					})
+					.saveToFile(_OUTPUT_PATH + '/' + uuid + '_720p_3000k.mp4');
+				},
+				(callback) => {
+					CREATE_THUMBNAILS(path.join(_INPUT_PATH, filename), job.parameters.startTime, job.parameters.endTime, callback);
+				}
+			], (err, results) => {
+				if(err) return callback(err);
+				return callback(null, results);
+			});
+		},
+		// Upload to GCS
+		function(filenames, callback) {
+			dir.files(_OUTPUT_PATH, function(err, files) {
+				if(err) throw err;
+				console.log('Files to upload: ' + files.length);
+
+				async.eachOfLimit(files, 100, function(absolute_fn, key, callback) {
+					if(!MIME_TYPE_LUT[path.extname(absolute_fn)]) return; // Only upload allowed extensions
+
+					var _options = { // GCS options
+						resumable: false, // default is true for files >5MB
+						validation: false, // Disable crc32/md5 checksum validation
+						destination: path.join(_GCS_BASEPATH, path.relative(_OUTPUT_PATH, absolute_fn)),
+						metadata: {
+							contentType: MIME_TYPE_LUT[path.extname(absolute_fn)],
+							cacheControl: 'public, max-age=31556926'
+						}
+					};
+
+					GCS_UPLOAD_RECURSIVE(absolute_fn, _options, callback);
+				},
+				function(err) {
+					console.log('Completed upload ' + files.length);
+					callback(null, filenames);
+				});
+			});
+		}
+	], function(err, results) {
+		if(err) {
+			Raven.captureException(err);
+			return request.put({
+				url: _API_HOST + '/v2/transcode/jobs/' + job.id + '/error',
+				method: 'PUT',
+				json: { message: err }
+			}, function(error, response, body) {
+				_transcodeInProgress = false;
+				console.log('PUTTING TO assets_transcode_queue: ERROR')
+			});
+		}
+
+		async.parallel([
+			function(callback) { // Update queue status to FINISHED
+				console.log('PUTTING TO assets_transcode_queue: FINISHED');
+				request.put(_API_HOST + '/v2/transcode/jobs/' + job.id + '/finished', function(error, response, body) { callback(); });
+			},
+			function(callback) { // Update user_exported_highlights table with urls
+				console.log("PUT TO user_exported_highlights");
+
+				_PUT_BODY = {
+					mp4_720p: 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, results[0]),
+					thumbnails: JSON.stringify(results[1].map(function(e) {return 'https://cdn-google.broadcast.cx/' + path.join(_GCS_BASEPATH, 'thumbs', e)})),
+					duration: parseInt((job.parameters.endTime - job.parameters.startTime) * 1000)
+				};
+
+
+				request.put({
+					url: _API_HOST + '/v2/assets/individual_highlight/' + job.parameters.individual_highlight_id,
+					method: 'PUT',
+					json: _PUT_BODY
+				}, function(error, response, body) { callback(); });
+			}
+		], function(err, response) {
+			_transcodeInProgress = false;
+		});
+	});
+
+}
+
+
 
 
 
@@ -819,12 +1032,20 @@ setInterval(function() { // Poll DB for new jobs if there is no transcode in pro
 	if(_transcodeInProgress) return;
 
 	async.waterfall([
-		function(callback) { // Get list of queued transcodes from the DB
-			request.put(_API_HOST + '/v2/transcode/jobs/request', function(error, response, body) {
+		function(callback) {
+			// Get list of queued transcodes from the DB
+			// Send machine information along
+			request.put({
+				url: _API_HOST + '/v2/transcode/jobs/request',
+				method: 'PUT',
+				json: {
+					machine_details: machine_details // Send machine information
+				}
+			}, function(error, response, body) {
 				if(error) return callback('Error connecting to queue.');
-				if(JSON.parse(body).length == 0) return callback('No jobs in the queue.');
+				if(body.length == 0) return callback('No jobs in the queue.');
 
-				callback(null, JSON.parse(body));
+				callback(null, body);
 			});
 		},
 		function(job, callback) {
@@ -832,6 +1053,7 @@ setInterval(function() { // Poll DB for new jobs if there is no transcode in pro
 
 			if(job.type == 'fullGame') MASTER_GAME_FOOTAGE_HLS(job.filename, job, callback);
 			if(job.type == 'event') MASTER_TRIM(job.filename, job, callback);
+			if(job.type == 'individualHighlight') MASTER_INDIVIDUAL_HIGHLIGHT(job.filename, job, callback);
 		}
 	], function(err, response) {
 		if(err) return console.log(err);

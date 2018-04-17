@@ -40,7 +40,6 @@ PM2_HOME=/root/.pm2 NODE_ENV=production pm2 start app.js
 * Terminate PM2
 *
 
-
 ### Workflow to upload & transcode & tag game videos from YouTube
 * `youtube-dl` to download and merge original files
 * `gsutil -m cp` to `broadcast-cx-raw-recordings` bucket
