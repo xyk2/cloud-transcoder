@@ -71,7 +71,7 @@ if(process.env.NODE_ENV == 'production') {
 	_API_HOST = 'http://local.broadcast.cx:8087';
 	ffmpeg.setFfmpegPath('/Users/XYK/Desktop/ffmpeg'); // Explicitly set ffmpeg and ffprobe paths
 	ffmpeg.setFfprobePath('/Users/XYK/Desktop/ffprobe');
-	_PORT = 8080;
+	_PORT = 8082;
 	_WS_PORT = 8081;
 }
 
