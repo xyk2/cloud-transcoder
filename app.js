@@ -764,7 +764,7 @@ MASTER_INDIVIDUAL_HIGHLIGHT = function(filename, job, callback) {
 					if(job.parameters.startTime && job.parameters.endTime) {
 						job.parameters.startTime = Math.max(job.parameters.startTime, 0);
 						_HD_720P.seekInput(job.parameters.startTime - 10 < 0 ? 0 : job.parameters.startTime - 10);
-						_HD_720P.outputOptions(['-ss ' + (job.parameters.startTime).toFixed(2), '-t ' + (job.parameters.endTime - job.parameters.startTime), '-copyts']);
+						_HD_720P.outputOptions(['-ss ' + (job.parameters.startTime).toFixed(2), '-t ' + (job.parameters.endTime - job.parameters.startTime), '-copyts', '-start_at_zero']);
 					}
 
 					if(path.extname(filename) == '.avi') {
