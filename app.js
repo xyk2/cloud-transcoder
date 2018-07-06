@@ -879,7 +879,7 @@ setInterval(function() { // Poll DB for new jobs if there is no transcode in pro
 	if(_transcodeInProgress) return;
 
 	async.waterfall([
-		function(callback) {
+		(callback) => {
 			// Get list of queued transcodes from the DB
 			// Send machine information along
 			request.put({
@@ -887,22 +887,23 @@ setInterval(function() { // Poll DB for new jobs if there is no transcode in pro
 				method: 'PUT',
 				json: {
 					machine_details: machine_details // Send machine information
-				}
-			}, function(error, response, body) {
-				if(error) return callback('Error connecting to queue.');
+				},
+				timeout: 1500
+			}, (error, response, body) => {
+				if(error || ![404, 200].includes(response.statusCode)) return callback(`Error connecting to queue (${error || response.statusCode})`);
 				if(body.length == 0) return callback('No jobs in the queue.');
 
 				callback(null, body);
 			});
 		},
-		function(job, callback) {
+		(job, callback) => {
 			_transcodeInProgress = true;
 
 			if(job.type == 'fullGame') MASTER_GAME_FOOTAGE_HLS(job.filename, job, callback);
 			if(job.type == 'event') MASTER_TRIM(job.filename, job, callback);
 			if(job.type == 'individualHighlight') MASTER_INDIVIDUAL_HIGHLIGHT(job.filename, job, callback);
 		}
-	], function(err, response) {
+	], (err, response) => {
 		if(err) return console.log(err);
 	});
 }, 2000 + Math.floor(Math.random() * 1000)); // Keep initialization times somewhat random
