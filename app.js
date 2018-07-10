@@ -36,6 +36,7 @@ if(process.env.NODE_ENV == 'production') {
 	ffmpeg.setFfprobePath('/Users/XYK/Desktop/ffprobe');
 	_PORT = 8082;
 	_WS_PORT = 8081;
+	Raven.config(null).install();
 }
 
 // Grab machine details from GCP if available, otherwise null
