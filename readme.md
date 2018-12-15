@@ -1,6 +1,9 @@
-# FFMPEG runner for NodeJS and GCS
+# Cloud transcoding adaptive bitrate MP4 and HLS
 
-### Configuring boot disk template
+Transcodes a source video file (MP4, AVI, MPG, M4A, WMV, MOV) to adaptive bitrate MP4 and HLS to be stored in Google Cloud Storage. Cheaper than 3rd party transcoding services by more than 40-50x when running on preemptible instances (compared to AWS Elastic Transcoder, Zencoder, Bitmovin, Cloudinary), and saves time/bandwidth massively by transcoding in the same region as where the files are stored.
+
+
+### Configuring boot disk template for GCE
 ```bash
 sudo add-apt-repository ppa:jonathonf/ffmpeg-3 # Enter to confirm
 sudo apt-get update
@@ -26,14 +29,13 @@ sudo cat /root/.ssh/id_rsa.pub
 #! /bin/bash
 
 ssh-keyscan github.com >> ~/.ssh/known_hosts
-git clone git@github.com:xyk2/broadcast.cx-ffmpeg-runner.git
+git clone git@github.com:xyk2/cloud-transcoder.git
 
-cd /broadcast.cx-ffmpeg-runner
+cd /cloud-transcoder
 npm install
 PM2_HOME=/root/.pm2 pm2 kill
 PM2_HOME=/root/.pm2 NODE_ENV=production pm2 start app.js
 ```
-
 
 ### Shutdown script before preemption
 * Call localhost endpoint to reset running job in DB queue
